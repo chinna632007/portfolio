@@ -1,0 +1,52 @@
+PRIYA NAIR
+priya.nair@example.com
++91 99887 76655
+Kochi, Kerala
+
+Profile
+Creative UI/UX designer and frontend developer who loves crafting accessible,
+human-centered digital experiences. Adept at translating complex problems
+into simple, beautiful interfaces.
+
+Education
+Master of Design (M.Des) in Interaction Design
+National Institute of Design, Ahmedabad
+2022 - 2024 | CGPA: 8.9 / 10
+
+Bachelor of Science in Computer Science
+Cochin University of Science and Technology
+2018 - 2021 | Percentage: 91%
+
+Projects
+Bloom - Mental Wellness App
+Designed end-to-end UX for a meditation and journaling app with 10k+
+downloads; conducted 24 user interviews and 3 rounds of usability testing.
+
+Portfolio Design System
+Built a modular Figma design system with 60+ components and dark-mode
+variants, adopted by 4 student startups.
+
+Flood Relief Dashboard
+Created a real-time volunteer coordination dashboard used by 1,200
+volunteers during the 2023 Kerala floods.
+
+Skills
+Figma, Adobe XD, Sketch
+HTML5, CSS3, JavaScript, React
+User Research, Wireframing, Prototyping
+Design Tokens, Accessibility (WCAG 2.1)
+
+Hobbies
+Watercolor painting, photography, trekking, classical dance (Mohiniyattam),
+reading science fiction
+
+Social Links
+LinkedIn: https://www.linkedin.com/in/priya-nair
+Behance: https://behance.net/priyanair
+Dribbble: https://dribbble.com/priyanair
+Personal Website: https://priyanair.design
+
+Extra Curricular Activities
+Design Lead, NID Design Club - organized 8 workshops attended by 500+ students.
+Volunteer designer, Techie Youth Foundation - created branding for 6 NGO campaigns.
+Runner-up, Inter-college UI Design Championship 2021.

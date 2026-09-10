@@ -1,0 +1,46 @@
+ROHAN VERMA
+Full Stack Developer | Cloud Enthusiast
+rohan.verma@example.com | +91 91234 56789 | Pune, Maharashtra
+
+Professional Summary
+Results-driven software engineer with 4 years of experience designing and
+shipping scalable web platforms. Passionate about clean architecture,
+developer experience and cloud-native systems.
+
+Experience
+Senior Software Engineer - Infosys Ltd (Jan 2023 - Present)
+Leading a team of 5 engineers building microservices on AWS.
+Reduced API latency by 40% by introducing Redis caching layers.
+Mentor junior developers and run internal code-review workshops.
+
+Software Engineer - TCS (Jul 2020 - Dec 2022)
+Developed and maintained 12+ REST services in Spring Boot.
+Automated CI/CD pipelines with Jenkins and Docker, cutting deploy
+time from 45 minutes to 8 minutes.
+
+Internships
+Backend Development Intern - Zoho Corporation (May 2022 - Jul 2022)
+Worked on invoice generation microservice handling 10k requests/day.
+Wrote integration test suites improving coverage from 61% to 89%.
+
+Technical Skills
+Languages: Java, Python, Go, SQL
+Frameworks: Spring Boot, Django, React
+Cloud & DevOps: AWS (EC2, S3, Lambda), Docker, Kubernetes, Jenkins
+Databases: PostgreSQL, MongoDB, Redis
+
+Certifications
+AWS Certified Solutions Architect - Associate (Amazon Web Services, 2023)
+Certified Kubernetes Application Developer (CNCF, 2022)
+Spring Professional Certification (VMware, 2021)
+
+Achievements
+Winner, Smart India Hackathon 2022 (Team DevSprint) among 480 teams.
+Received TCS Gems Award for outstanding delivery in Q3 2021.
+Published internal library "fast-json-mask" used across 6 product teams.
+
+Languages
+English (Professional Working Proficiency)
+Hindi (Native)
+Marathi (Conversational)
+German (A2 - Beginner)

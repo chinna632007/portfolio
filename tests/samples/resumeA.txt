@@ -1,0 +1,45 @@
+ANJALI SHARMA
+Career Objective
+To secure a challenging position as a Full Stack Developer in a growth-oriented
+organization where I can utilize my knowledge of modern web technologies and
+contribute to meaningful products while continuously learning new skills.
+
+Education
+B.Tech in Computer Science and Engineering
+Rajiv Gandhi Institute of Technology, Bengaluru
+2021 - 2025 | CGPA: 8.7 / 10
+
+Higher Secondary Certificate (Class XII)
+St. Joseph's Junior College, Hyderabad
+2019 - 2021 | Percentage: 94.2%
+
+Secondary School Certificate (Class X)
+Little Flower High School, Hyderabad
+2018 - 2019 | GPA: 9.8 / 10
+
+Skills
+JavaScript, Python, Java, C++
+React, Node.js, Express.js, MongoDB, MySQL
+HTML5, CSS3, Git, GitHub, VS Code
+REST APIs, Firebase, Tailwind CSS
+
+Projects
+E-Commerce Web Application
+Built a full-stack online store with product catalog, cart and secure checkout
+using React, Node.js and MongoDB. Implemented JWT authentication and
+Razorpay payment integration.
+
+Student Attendance Management System
+Developed a web app that automates attendance tracking for 500+ students
+with QR-code based marking and monthly analytics reports.
+
+Weather Forecast App
+Created a responsive weather dashboard consuming the OpenWeather API
+with 5-day forecasts and geolocation support.
+
+Contact Information
+Email: anjali.sharma@example.com
+Phone: +91 98765 43210
+LinkedIn: linkedin.com/in/anjali-sharma
+GitHub: github.com/anjali-sharma
+Location: Bengaluru, Karnataka, India
