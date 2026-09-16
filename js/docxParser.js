@@ -73,19 +73,3 @@ var DocxParser = (function () {
 })();
 
 if (typeof window !== 'undefined') window.DocxParser = DocxParser;
-    var m = window.mammoth;
-    var viaMammoth = Promise.resolve('');
-    if(m && typeof m.extractRawText === 'function'){
-      viaMammoth = file.arrayBuffer().then(function(buf){
-        return m.extractRawText({arrayBuffer:buf}).then(function(r){
-          return String(r && r.value ? r.value : '');
-        });
-      });
-  function readU16(d,o){return (d[o]|(d[o+1]<<8))&0xffff;}
-  function readU32(d,o){return (d[o]|(d[o+1]<<8)|(d[o+2]<<16)|(d[o+3]<<24))>>>0;}
-  function bytesToAscii(bytes,off,len){ var s=''; for(var i=0;i<len;i++) s+=String.fromCharCode(bytes[off+i]&0x7f); return s; }
-  function findEOCD(bytes){ var n=bytes.length; if(n<22) return null; var maxScan=Math.min(n-22,0x10000+22); for(var i=n-22; i>=n-22-maxScan && i>=0; i--){ if(readU32(bytes,i)===0x06054b50){ var total=readU16(bytes,i+10); var cdSize=readU32(bytes,i+12); var cdOff=readU32(bytes,i+16); if(cdOff+cdSize<=n) return {totalEntries:total, cdOffset:cdOff}; } } return null; }
-  function readCentralEntry(bytes,off){ if(off+46>bytes.length) return null; if(readU32(bytes,off)!==0x02014b50) return null; var method=readU16(bytes,off+10); var compSize=readU32(bytes,off+20); var uncompSize=readU32(bytes,off+24); var nameLen=readU16(bytes,off+28); var extraLen=readU16(bytes,off+30); var commentLen=readU16(bytes,off+32); var headerOff=readU32(bytes,off+42); var name=bytesToAscii(bytes,off+46,nameLen); return { method:method, compSize:compSize, uncompSize:uncompSize, headerOffset:headerOff, name:name, nextOff:off+46+nameLen+extraLen+commentLen }; }
-  function getLocalFile(bytes,headerOff){ if(readU32(bytes,headerOff)!==0x04034b50) return null; var method=readU16(bytes,headerOff+8); var compSize=readU32(bytes,headerOff+18); var nameLen=readU16(bytes,headerOff+26); var extraLen=readU16(bytes,headerOff+28); var start=headerOff+30+nameLen+extraLen; return {method:method, data:bytes.slice(start,start+compSize)}; }
-
-    }

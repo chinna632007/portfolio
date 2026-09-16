@@ -4,6 +4,7 @@
    - Scroll reveal via IntersectionObserver
    - Staggered fade/slide-up
    - Scroll-spy for the generated portfolio navigation
+   - Scroll-progress bar for the generated portfolio navigation
    - Smooth in-preview anchor scrolling
    - Respects prefers-reduced-motion
    ========================================================= */
@@ -95,13 +96,57 @@ const Animations = (function () {
         });
     }
 
+    /* Scroll-progress bar for the generated portfolio (nav ribbon).
+       Works both inside the scrollable preview pane and in the
+       standalone export, and re-binds safely on every re-render. */
+    const progressBound = new WeakMap();
+
+    function scrollMetrics(root) {
+        const doc = document.scrollingElement || document.documentElement;
+        if (root && root.scrollHeight > root.clientHeight + 4) {
+            return { pos: root.scrollTop, max: root.scrollHeight - root.clientHeight };
+        }
+        const pos = window.pageYOffset || doc.scrollTop || 0;
+        return { pos: pos, max: Math.max(1, doc.scrollHeight - window.innerHeight) };
+    }
+
+    function initScrollProgress(root, bar) {
+        if (!root || !bar) return null;
+        const paint = () => {
+            const m = scrollMetrics(root);
+            const pct = m.max > 0 ? Math.min(1, Math.max(0, m.pos / m.max)) : 0;
+            bar.style.width = (pct * 100).toFixed(2) + '%';
+        };
+        let state = progressBound.get(root);
+        if (!state) {
+            const raf = window.requestAnimationFrame || ((fn) => setTimeout(fn, 16));
+            const onScroll = () => {
+                if (state.ticking) return;
+                state.ticking = true;
+                raf(() => { state.ticking = false; state.paint(); });
+            };
+            state = { paint: paint, ticking: false };
+            progressBound.set(root, state);
+            root.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll, { passive: true });
+        }
+        state.paint = paint;   /* always point at the newest bar element */
+        paint();
+        return state;
+    }
+
     function init(root) {
         reduced = prefersReduced();
         initReveal(root);
         initCounters(root);
     }
 
-    return { init: init, initReveal: initReveal, initCounters: initCounters, initPortfolioNav: initPortfolioNav, bindSmoothAnchors: bindSmoothAnchors };
+    return {
+        init: init, initReveal: initReveal, initCounters: initCounters,
+        initPortfolioNav: initPortfolioNav, initScrollProgress: initScrollProgress,
+        bindSmoothAnchors: bindSmoothAnchors
+    };
 })();
 
 window.Animations = Animations;

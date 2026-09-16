@@ -91,6 +91,7 @@ ok(!!sandbox.Upload && !!sandbox.Animations && !!sandbox.PdfParser && !!sandbox.
 const SAMPLES = [
     {
         file: 'resumeA.txt', name: 'ANJALI SHARMA', email: 'anjali.sharma@example.com',
+        location: 'Bengaluru, Karnataka, India',
         titles: ['Career Objective', 'Education', 'Skills', 'Projects', 'Contact Information'],
         inventedAbsent: ['About Me'],
         spot: ['CGPA: 8.7 / 10', 'Rajiv Gandhi Institute of Technology, Bengaluru',
@@ -99,6 +100,7 @@ const SAMPLES = [
     },
     {
         file: 'resumeB.txt', name: 'ROHAN VERMA', email: 'rohan.verma@example.com',
+        location: 'Pune, Maharashtra',
         titles: ['Professional Summary', 'Experience', 'Internships', 'Technical Skills',
             'Certifications', 'Achievements', 'Languages'],
         inventedAbsent: ['About Me'],
@@ -108,6 +110,7 @@ const SAMPLES = [
     },
     {
         file: 'resumeC.txt', name: 'PRIYA NAIR', email: 'priya.nair@example.com',
+        location: 'Kochi, Kerala',
         titles: ['Profile', 'Education', 'Projects', 'Skills', 'Hobbies', 'Social Links',
             'Extra Curricular Activities'],
         inventedAbsent: ['Full Stack Developer'],
@@ -122,6 +125,63 @@ function chipUnits(line) {
         .filter(Boolean);
 }
 
+/* ---------- structured-layout helpers ---------- */
+/* mirrors the generator's sectionId() so a section can be sliced out */
+function sectionId(idx, title) {
+    const s = String(title || 'section').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'section';
+    return 'pf-s' + String(idx + 1).padStart(2, '0') + '-' + s;
+}
+function sectionChunk(html, id) {
+    const start = html.indexOf('id="' + id + '"');
+    if (start === -1) return '';
+    const next = html.indexOf('id="pf-s', start + 6);
+    return html.slice(start, next === -1 ? html.length : next);
+}
+const countIn = (chunk, re) => (chunk.match(re) || []).length;
+/* mirrors the generator's bracket-aware value splitter */
+function splitValuesLike(text) {
+    const parts = [];
+    let buf = '', depth = 0;
+    for (const ch of String(text == null ? '' : text)) {
+        if ('([{'.indexOf(ch) !== -1) { depth++; }
+        else if (')]}'.indexOf(ch) !== -1) { depth = Math.max(0, depth - 1); }
+        else if (depth === 0 && (ch === ',' || ch === ';' || ch === '|' ||
+            ch === '\u2022' || ch === '\u25aa' || ch === '\u00b7')) { parts.push(buf); buf = ''; continue; }
+        buf += ch;
+    }
+    parts.push(buf);
+    return parts.map((p) => p.replace(/^[\-*\u00b7\u2022\u25aa\s]+/, '').replace(/[\s\u2022\u00b7*]+$/, '').trim()).filter(Boolean);
+}
+
+/* ---------- expected layout of the generated portfolio ---------- */
+const STRUCTURE = {
+    'resumeA.txt': {
+        'Education': { entries: 3, subs: 3, metas: 3 },
+        'Skills': { skillGroups: 1, labels: [], chips: 17 },
+        'Projects': { entries: 3, texts: 3 },
+        'Contact Information': { chips: 7 }
+    },
+    'resumeB.txt': {
+        'Experience': { entries: 2, items: 5 },
+        'Internships': { entries: 1, items: 2 },
+        'Technical Skills': {
+            skillGroups: 4, chips: 14,
+            labels: ['Languages', 'Frameworks', 'Cloud & DevOps', 'Databases']
+        },
+        'Certifications': { entries: 3, grids: 1 },
+        'Achievements': { entries: 3, grids: 1 },
+        'Languages': { chips: 4 }
+    },
+    'resumeC.txt': {
+        'Education': { entries: 2, subs: 2, metas: 2 },
+        'Projects': { entries: 3, texts: 3 },
+        'Skills': { skillGroups: 1, labels: [], chips: 12 },
+        'Hobbies': { chips: 5 },
+        'Social Links': { entries: 4, grids: 1 },
+        'Extra Curricular Activities': { entries: 3, grids: 1 }
+    }
+};
+
 SAMPLES.forEach((S) => {
     head('Sample ' + S.file.toUpperCase());
     const text = fs.readFileSync(path.join(ROOT, 'tests', 'samples', S.file), 'utf8');
@@ -133,6 +193,7 @@ SAMPLES.forEach((S) => {
         'detects exact original titles in original order (' + titled.length + ' titled sections)');
     ok(parsed.personalInfo.name === S.name, 'extracts exact name "' + S.name + '"');
     ok(parsed.personalInfo.email === S.email, 'extracts exact email');
+    ok(parsed.personalInfo.location === S.location, 'extracts exact location "' + S.location + '"');
 
     /* validation / integrity */
     const rep = RA.validate(parsed);
@@ -189,6 +250,12 @@ SAMPLES.forEach((S) => {
     if (S.file === 'resumeB.txt') ok(html.indexOf('pf-hero-role') !== -1, 'hero shows role (exists in resume)');
     else ok(html.indexOf('pf-hero-role') === -1, 'hero invents no role (none in resume)');
 
+    /* the hero header must never mistake a skills row for the location */
+    const heroPills = (html.match(/<div class="pf-hero-pills">[\s\S]*?<\/div>/) || [''])[0];
+    ok(heroPills.indexOf('REST APIs') === -1 && heroPills.indexOf('Figma') === -1,
+        'hero never mistakes a skills row for the location');
+    ok(heroPills.indexOf(esc(S.location)) !== -1, 'hero shows the location from the resume');
+
     /* customization: hide a section */
     const hiddenHtml = PG.render(parsed, { hidden: [S.titles[2]] });
     ok((hiddenHtml.match(/href="#pf-s\d+/g) || []).length === S.titles.length - 1,
@@ -200,7 +267,118 @@ SAMPLES.forEach((S) => {
     ok(sg.indexOf('<!DOCTYPE html>') === 0 && sg.slice(-7) === '</html>', 'standalone export is a complete HTML file');
     ok(sg.indexOf(esc(S.name)) !== -1 && S.titles.every((t) => sg.indexOf(esc(t)) !== -1),
         'standalone export keeps name + all titles');
+
+    /* standalone export ships the same design system + working motion */
+    ok(sg.indexOf('pf-progress') !== -1, 'standalone export keeps the reading-progress bar');
+    ok(sg.indexOf('.pf-skill-group{') !== -1 && sg.indexOf('@keyframes pfFloat') !== -1,
+        'standalone export ships the skills/motion CSS');
+    ok(sg.indexOf('.pf-root .reveal.visible{') !== -1, 'standalone export can reveal on scroll');
+    let inlineOk = true, inlineMsg = '';
+    try {
+        new Function(sg.slice(sg.indexOf('<script>') + 8, sg.lastIndexOf('</script>')));
+    } catch (e) { inlineOk = false; inlineMsg = e.message; }
+    ok(inlineOk, 'standalone export script is valid JavaScript' + (inlineMsg ? ' (' + inlineMsg + ')' : ''));
+
+    /* ---------- structured layout: skills categories + ordered cards ---------- */
+    const titledSections = parsed.sections.filter((s) => s.original);
+    const expected = STRUCTURE[S.file] || {};
+    Object.keys(expected).forEach((title) => {
+        const idx = titledSections.findIndex((s) => s.original === title);
+        ok(idx !== -1, 'layout: "' + title + '" section present');
+        if (idx === -1) return;
+        const chunk = sectionChunk(html, sectionId(idx, title));
+        ok(chunk !== '', 'layout: "' + title + '" has its own anchored section');
+        const exp = expected[title];
+        if (exp.entries !== undefined) {
+            ok(countIn(chunk, /class="pf-entry reveal/g) === exp.entries,
+                'layout: "' + title + '" renders ' + exp.entries + ' card(s) in resume order');
+        }
+        if (exp.subs !== undefined) {
+            ok(countIn(chunk, /class="pf-entry-sub"/g) === exp.subs,
+                'layout: "' + title + '" shows ' + exp.subs + ' subtitle(s)');
+        }
+        if (exp.metas !== undefined) {
+            ok(countIn(chunk, /class="pf-entry-meta"/g) === exp.metas,
+                'layout: "' + title + '" shows ' + exp.metas + ' date/score badge(s)');
+        }
+        if (exp.items !== undefined) {
+            ok(countIn(chunk, /<li class="reveal/g) === exp.items,
+                'layout: "' + title + '" turns ' + exp.items + ' lines into highlight list items');
+        }
+        if (exp.texts !== undefined) {
+            ok(countIn(chunk, /class="pf-entry-text"/g) === exp.texts,
+                'layout: "' + title + '" wraps descriptions in ' + exp.texts + ' paragraph(s)');
+        }
+        if (exp.grids !== undefined) {
+            ok(countIn(chunk, /class="pf-entries-grid"/g) === exp.grids,
+                'layout: "' + title + '" uses a compact card grid');
+        }
+        if (exp.skillGroups !== undefined) {
+            ok(countIn(chunk, /class="pf-skill-group reveal"/g) === exp.skillGroups,
+                'layout: "' + title + '" builds ' + exp.skillGroups + ' skill category group(s)');
+        }
+        if (exp.chips !== undefined) {
+            ok(countIn(chunk, /class="pf-chip reveal"/g) === exp.chips,
+                'layout: "' + title + '" shows ' + exp.chips + ' chip(s)');
+        }
+        if (exp.labels) {
+            const found = (chunk.match(/pf-skill-group-label">([^<]*)</g) || [])
+                .map((m) => m.replace('pf-skill-group-label">', '').replace(/<$/, ''));
+            ok(JSON.stringify(found) === JSON.stringify(exp.labels.map(esc)),
+                'layout: "' + title + '" keeps the category labels in resume order');
+        }
+    });
+
+    /* labelled skill lines keep their category AND every single value */
+    parsed.sections.filter((s) => s.type === 'skills').forEach((sec) => {
+        sec.lines.forEach((line) => {
+            const m = line.match(/^([A-Za-z][^:,;|]{1,34}?)\s*:\s*(\S.*)$/);
+            if (!m) return;
+            const label = m[1].trim();
+            ok(html.indexOf(esc(label)) !== -1, 'skills: category "' + clip(label) + '" preserved');
+            splitValuesLike(m[2]).forEach((v) => {
+                ok(html.indexOf(esc(v)) !== -1, 'skills: value "' + clip(v) + '" preserved');
+            });
+        });
+    });
 });
+
+head('Project presentation regressions');
+const projectResume = RA.analyze([
+    'RAVI KUMAR', 'Projects', 'Smart Health Monitor',
+    'Built a live dashboard', 'for patient monitoring.',
+    'Technologies: Arduino, Node.js, AWS (EC2, S3)',
+    '- JWT Authentication', '- Delivered alerts in under two seconds',
+    'with SMS notifications.', 'Source: https://github.com/ravi/health', '',
+    'campus voting portal', 'Created a secure voting portal.',
+    'Tech stack: React, PostgreSQL', '',
+    'Certifications', 'Cloud Practitioner', 'Skills', 'Languages: Java, Python'
+].join('\n'), 'projects.txt');
+const projectOutput = PG.render(projectResume, {});
+const cards = projectOutput.match(/<article class="pf-entry reveal pf-project"[\s\S]*?<\/article>/g) || [];
+ok(cards.length === 2, 'projects: two cards, including a lowercase title after a blank separator');
+ok(projectResume.sections[0].breakBefore.length === 1, 'analyzer retains project boundary metadata');
+ok(cards[0] && cards[0].includes('<h3 class="pf-entry-title">Smart Health Monitor</h3>'), 'projects: semantic project heading');
+ok(cards[0] && cards[0].includes('<p class="pf-entry-text">Built a live dashboard for patient monitoring.</p>'), 'projects: short descriptions remain paragraphs, not subtitles');
+ok(cards[0] && cards[0].includes('<li>JWT Authentication</li>'), 'projects: title-case bullet is a highlight, not a new card');
+ok(cards[0] && cards[0].includes('Delivered alerts in under two seconds with SMS notifications.</li>'), 'projects: wrapped bullet remains one highlight');
+ok(cards[0] && cards[0].includes('<dt>Technologies</dt>') && cards[0].includes('>AWS (EC2, S3)</span>'), 'projects: explicit technology labels and bracketed values preserved');
+ok(cards[0] && cards[0].includes('href="https://github.com/ravi/health" target="_blank" rel="noopener noreferrer"'), 'projects: source URL is clickable with safe external-link attributes');
+ok(cards[1] && cards[1].includes('campus voting portal') && !cards[1].includes('Arduino'), 'projects: descriptions and stacks stay with their project');
+ok(projectOutput.indexOf('>Certifications</h2>') > projectOutput.lastIndexOf('</article>'), 'remaining sections stay separate and follow resume order');
+const oldData = JSON.parse(JSON.stringify(projectResume));
+delete oldData.sections[0].breakBefore;
+oldData.sections[0].lines = ['1. First Project', 'Built a website.', '2. Second Project', 'Created a quiz.'];
+ok((PG.render(oldData, {}).match(/<article /g) || []).length === 2, 'projects: older saved data without boundary metadata still renders');
+const unsafe = JSON.parse(JSON.stringify(oldData));
+unsafe.sections[0].lines = ['Example Project', 'Built <script>alert(1)</script> safely.', 'URL: javascript:alert(1)'];
+const safeHtml = PG.render(unsafe, {});
+ok(safeHtml.includes('&lt;script&gt;') && !safeHtml.includes('href="javascript:'), 'projects: uploaded markup is escaped and script URLs are not linked');
+const projectExport = PG.buildStandalone(projectResume, { theme: 'dark' });
+const sharedStyle = projectOutput.match(/<style>([\s\S]*?)<\/style>/)[1];
+ok(projectExport.includes(sharedStyle), 'preview and export share identical layout refinements');
+ok(sharedStyle.includes('@media(max-width:640px)') && sharedStyle.includes('grid-template-columns: minmax(0, 1fr)'), 'layout includes single-column mobile cards');
+ok(sharedStyle.includes('@media(prefers-reduced-motion:reduce)') && sharedStyle.includes('@media print'), 'layout supports reduced motion and visible printed content');
 
 head('RESULT');
 console.log('  ' + pass + ' passed, ' + fail + ' failed');

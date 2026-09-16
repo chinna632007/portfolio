@@ -16,6 +16,31 @@ var KNOWN = [
 ['links', ['social links', 'links', 'online presence', 'profiles', 'portfolio links', 'find me online']],
 ['activities', ['extra curricular activities', 'extracurricular activities', 'extra-curricular', 'activities', 'volunteering', 'community', 'leadership']]
 ];
+/* Common main-heading variants. Classification chooses a layout only;
+   the original heading text is kept unchanged in the portfolio. */
+var EXTRA = {
+summary: ['professional profile', 'personal profile', 'career goal'],
+education: ['educational qualifications', 'academic qualifications', 'academic details', 'education details'],
+experience: ['professional background', 'employment', 'work history'],
+internships: ['internship experience', 'industrial training'],
+skills: ['technical expertise', 'technical proficiencies', 'technical competencies', 'technical skills and tools', 'programming skills', 'professional skills', 'soft skills', 'strengths', 'personal strengths', 'core competencies'],
+projects: ['project experience', 'project details', 'academic projects and research', 'major projects'],
+certifications: ['certificates', 'professional certifications', 'certifications and courses', 'courses and certifications', 'certifications and training', 'training and certifications', 'licenses and certifications', 'certificates and achievements', 'certifications and achievements', 'certifications and awards', 'workshops and certifications', 'workshops', 'workshops and seminars', 'training and workshops'],
+achievements: ['academic achievements', 'awards and achievements', 'achievements and awards', 'honors and awards', 'awards and honors', 'accomplishments and awards'],
+languages: ['languages known', 'language skills', 'languages spoken'],
+hobbies: ['hobbies and interests', 'interests and hobbies'],
+activities: ['extra curricular', 'co curricular activities', 'extra curricular activities', 'extracurricular achievements', 'positions of responsibility', 'leadership experience', 'volunteer experience', 'volunteer work', 'community service', 'leadership and activities'],
+contact: ['personal details', 'personal information', 'personal particulars'],
+links: ['professional profiles', 'coding profiles'],
+publications: ['publications', 'research publications', 'research papers', 'research experience', 'publications and research'],
+references: ['references', 'professional references'],
+declaration: ['declaration', 'additional information', 'other information']
+};
+Object.keys(EXTRA).forEach(function (type) {
+var entry = KNOWN.find(function (k) { return k[0] === type; });
+if (entry) entry[1] = entry[1].concat(EXTRA[type]);
+else KNOWN.push([type, EXTRA[type]]);
+});
 var SORTED = KNOWN.map(function (k) {
 return { type: k[0], names: k[1].slice().sort(function (a, b) { return b.length - a.length; }) };
 });
@@ -30,7 +55,7 @@ return String(s == null ? '' : s).toLowerCase().replace(/[|\u2013\u2014_]+/g, ' 
    followed only by whitespace/punctuation — NOT when the name is just
    a prefix of a labelled data line like "Languages: Java, Python". */
 function classify(title) {
-var n = norm(title);
+var n = norm(String(title || '').replace(/^\s*(?:\d+[.)]|[IVX]+[.)])\s*/i, '').replace(/&/g, ' and ').replace(/\s*:\s*$/, ''));
 var best = null, bestLen = -1;
 SORTED.forEach(function (entry) {
 entry.names.forEach(function (name) {
@@ -45,13 +70,15 @@ return best || 'generic';
 var EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 var PHONE_RE = /(\+?\d[\d\s\-().]{6,}\d)/;
 var URL_RE = /(https?:\/\/[^\s,;|]+|www\.[^\s,;|]+|[a-z0-9-]+\.(com|net|org|io|dev|design|in|me)(\/[^\s,;|]*)?)/i;
+/* City / State / Country line: "Bengaluru, Karnataka, India" */
+var ADDRESS_RE = /^[A-Z][A-Za-z .'&\-]{1,40}, ?[A-Z][A-Za-z .'&\-]{1,40}(, ?[A-Z][A-Za-z .'&\-]{1,40})?$/;
 function isContactLine(line) {
 var t = String(line || '').trim();
 if (!t) return false;
 if (EMAIL_RE.test(t) || PHONE_RE.test(t) || URL_RE.test(t)) return true;
 if (/^(email|e-mail|phone|mobile|tel|linkedin|github|location|address|website|portfolio)\s*:/i.test(t)) return true;
 /* City/State/Country address: "Bengaluru, Karnataka, India" */
-if (/^[A-Z][A-Za-z .'&\-]{1,40}, ?[A-Z][A-Za-z .'&\-]{1,40}(, ?[A-Z][A-Za-z .'&\-]{1,40})?$/.test(t) && t.length <= 60) return true;
+if (ADDRESS_RE.test(t) && t.length <= 60) return true;
 return false;
 }
 function findName(lines) {
@@ -109,6 +136,15 @@ var m;
 if (!email && (m = l.match(EMAIL_RE))) email = m[0];
 if (!phone && (m = l.match(PHONE_RE))) phone = m[0].trim();
 if (!location && l.indexOf(',') !== -1 && !EMAIL_RE.test(l) && !URL_RE.test(l) && l !== name && l !== title) location = l.trim();
+/* a piped contact line keeps the address in its last segment */
+if (!location) {
+    var _segs = l.split(/[|\u2022\u00b7]+/);
+    for (var _si = 0; _si < _segs.length; _si++) {
+        var _seg = _segs[_si].trim().replace(/^[A-Za-z ]{3,20}:\s*/, '');
+        if (!_seg || _seg.length > 60 || _seg.indexOf('@') !== -1 || URL_RE.test(_seg)) continue;
+        if (ADDRESS_RE.test(_seg)) { location = _seg; break; }
+    }
+}
 var lower = l.toLowerCase();
 if (!linkedin && lower.indexOf('linkedin') !== -1) { m = l.match(URL_RE); if (m) linkedin = m[0]; }
 if (!github && lower.indexOf('github') !== -1) { m = l.match(URL_RE); if (m) github = m[0]; }
@@ -131,19 +167,21 @@ break;
 }
 }
 }
-/* Fallback location: a short comma-separated address line
-   (e.g. "Bengaluru, Karnataka, India"), not institute names. */
+/* Fallback location: only a LABELLED address line is trusted
+   ("Location: Bengaluru, Karnataka, India").  A bare comma-separated
+   line is often a skills row ("REST APIs, Firebase, Tailwind CSS")
+   or an institute name, and mis-reading one of those as a city is
+   far worse than showing no location at all. */
 if (!location) {
-var _locLines = text.split('\n');
-for (var _li = 0; _li < _locLines.length; _li++) {
-var _lt = _locLines[_li].trim();
-if (!_lt || _lt === name || _lt === title) continue;
-if (EMAIL_RE.test(_lt) || URL_RE.test(_lt) || _lt.indexOf(',') === -1) continue;
-var _parts = _lt.split(',');
-if (_parts.length < 2) continue;
-var _good = _parts.every(function (p) { return p.trim().split(/\s+/).length <= 3; });
-if (_good) { location = _lt.replace(/^[^:]*:\s*/, '').trim(); break; }
-}
+    var _locLines = text.split('\n');
+    for (var _li = 0; _li < _locLines.length; _li++) {
+        var _lt = _locLines[_li].trim();
+        if (!_lt || _lt === name || _lt === title) continue;
+        var _lm = _lt.match(/^(?:location|address|city|based in|residence|hometown|place)\s*[:\-]\s*(.+)$/i);
+        if (!_lm) continue;
+        var _cand = _lm[1].trim();
+        if (_cand && _cand.length <= 80 && !EMAIL_RE.test(_cand)) { location = _cand; break; }
+    }
 }
 /* Fallback: scan full text for social/profile links (linkedin/github/website)
    that appeared in a Contact Information or Social Links section. */
@@ -164,15 +202,16 @@ var seenHeader = false;
 function pushCurrent() {
 if (!current) return;
 var content = current.lines.filter(function (l) { return l.trim(); });
-if (content.length) sections.push({ original: current.original, type: current.type, lines: content });
+if (content.length || current.original) sections.push({ original: current.original, type: current.type, lines: content, breakBefore: current.breakBefore || [] });
 current = null;
 }
+var afterBlank = false;
 lines.forEach(function (line) {
 var t = line.trim();
-if (!t) return;
+if (!t) { afterBlank = true; return; }
 if (t === name || t === title) return;
 var type = classify(t);
-if (type !== 'generic' && t.length <= 60 && t.split(/\s+/).length <= 5) {
+if (type !== 'generic' && t.length <= 100) {
 seenHeader = true;
 pushCurrent();
 current = { original: t, type: type, lines: [] };
@@ -180,8 +219,13 @@ current = { original: t, type: type, lines: [] };
 preHeaderContact.push(t);
 } else {
 if (!current) current = { original: null, type: 'generic', lines: [] };
+if (afterBlank && current.lines.length) {
+if (!current.breakBefore) current.breakBefore = [];
+current.breakBefore.push(current.lines.length);
+}
 current.lines.push(t);
 }
+afterBlank = false;
 });
 pushCurrent();
 /* Merge pre-header contact lines into any existing contact section.
