@@ -204,37 +204,24 @@ const PortfolioGenerator = (function () {
         return { label: label, value: value };
     }
 
-    /* Group the skill lines of a section into ordered category cards.
-       A repeated category is merged into the card of its first appearance,
-       so the categories keep the exact order of the resume. */
+    /* Merge only adjacent matching categories so repeated labels never move
+       later values ahead of intervening resume content. */
     function skillGroups(lines) {
         const groups = [];
-        const byLabel = {};
-        let plain = null;
-        let seq = 0;
-        function addValues(group, values) {
-            values.forEach((v) => {
-                const dup = group.values.some((x) => x.toLowerCase() === v.toLowerCase());
-                if (!dup) group.values.push(v);
-            });
-        }
         lines.forEach((raw) => {
             const line = String(raw == null ? '' : raw).trim();
             if (!line) return;
-            const lab = splitLabelled(line);
-            if (lab) {
-                const key = lab.label.toLowerCase();
-                if (!byLabel[key]) { byLabel[key] = { label: lab.label, values: [], sources: [], order: seq++ }; groups.push(byLabel[key]); }
-                const g = byLabel[key];
-                g.sources.push(line);
-                addValues(g, splitValues(lab.value));
-                return;
+            const labelled = splitLabelled(line);
+            const label = labelled ? labelled.label : '';
+            let group = groups[groups.length - 1];
+            if (!group || group.label.toLowerCase() !== label.toLowerCase()) {
+                group = { label: label, values: [], sources: [] };
+                groups.push(group);
             }
-            if (!plain) { plain = { label: '', values: [], sources: [], order: seq++ }; groups.push(plain); }
-            plain.sources.push(line);
-            addValues(plain, splitValues(line));
+            group.sources.push(line);
+            group.values.push(...splitValues(labelled ? labelled.value : line));
         });
-        return groups.filter((g) => g.values.length).sort((a, b) => a.order - b.order);
+        return groups.filter((group) => group.values.length);
     }
 
     /* Skills section markup: category cards that hold skill chips. */
@@ -388,17 +375,15 @@ const PortfolioGenerator = (function () {
         return entries;
     }
 
+    /* Keep every field and description in its source position, not fixed slots. */
     function projectHtml(entry, index) {
-        const title = entry[0].text;
         const blocks = [];
-        const fields = [];
-        const dates = [];
         let pending = null;
         const flush = () => { if (pending) blocks.push(pending); pending = null; };
         entry.slice(1).forEach((item) => {
             const field = projectField(item.text);
-            if (field) { flush(); fields.push(field); return; }
-            if (isMetaLine(item.text)) { flush(); dates.push(item.text); return; }
+            if (field) { flush(); blocks.push({ field: field }); return; }
+            if (isMetaLine(item.text)) { flush(); blocks.push({ date: item.text }); return; }
             if (item.bullet) { flush(); pending = { text: item.text, bullet: true }; return; }
             if (pending && !endsSentence(pending.text)) pending.text += ' ' + item.text;
             else { flush(); pending = { text: item.text, bullet: false }; }
@@ -406,25 +391,26 @@ const PortfolioGenerator = (function () {
         flush();
         let html = '<article class="pf-entry reveal pf-project" style="transition-delay:' + Math.min(index * 80, 320) + 'ms">' +
             '<header class="pf-project-head"><span class="pf-project-number" aria-hidden="true">' +
-            String(index + 1).padStart(2, '0') + '</span><h3 class="pf-entry-title">' + esc(title) + '</h3></header>';
-        if (dates.length) html += '<div class="pf-entry-metas">' + dates.map((d) => '<span class="pf-entry-meta">' + esc(d) + '</span>').join('') + '</div>';
-        html += '<div class="pf-project-description">';
-        let listOpen = false;
+            String(index + 1).padStart(2, '0') + '</span><h3 class="pf-entry-title">' + esc(entry[0].text) + '</h3></header>';
+        let listOpen = false, descriptionOpen = false;
+        const closeDescription = () => {
+            if (listOpen) { html += '</ul>'; listOpen = false; }
+            if (descriptionOpen) { html += '</div>'; descriptionOpen = false; }
+        };
         blocks.forEach((block) => {
+            if (block.field || block.date) {
+                closeDescription();
+                if (block.date) html += '<div class="pf-entry-metas"><span class="pf-entry-meta">' + esc(block.date) + '</span></div>';
+                else html += '<dl class="pf-project-tech"><div><dt>' + esc(block.field[1]) + '</dt><dd class="pf-chips">' +
+                    splitValues(block.field[2]).map((v) => '<span class="pf-chip">' + esc(v) + '</span>').join('') + '</dd></div></dl>';
+                return;
+            }
+            if (!descriptionOpen) { html += '<div class="pf-project-description">'; descriptionOpen = true; }
             if (block.bullet && !listOpen) { html += '<ul class="pf-entry-list">'; listOpen = true; }
             if (!block.bullet && listOpen) { html += '</ul>'; listOpen = false; }
             html += block.bullet ? '<li>' + linkedText(block.text) + '</li>' : '<p class="pf-entry-text">' + linkedText(block.text) + '</p>';
         });
-        if (listOpen) html += '</ul>';
-        html += '</div>';
-        if (fields.length) {
-            html += '<dl class="pf-project-tech">';
-            fields.forEach((field) => {
-                html += '<div><dt>' + esc(field[1]) + '</dt><dd class="pf-chips">' +
-                    splitValues(field[2]).map((v) => '<span class="pf-chip">' + esc(v) + '</span>').join('') + '</dd></div>';
-            });
-            html += '</dl>';
-        }
+        closeDescription();
         return html + '</article>';
     }
 
@@ -464,11 +450,68 @@ const PortfolioGenerator = (function () {
         return entries;
     }
 
+    /* Personal labels are recognized conservatively; unfamiliar lines remain visible. */
+    function personalRows(section) {
+        const label = /^(Name|Full Name|Date of Birth|DOB|Gender|Father[’']s Name|Mother[’']s Name|Nationality|Languages Known|Marital Status|Address|Phone|Mobile|Email)\s*(?::\s*|\s+)(.+)$/i;
+        return '<dl class="pf-details">' + (section.lines || []).map((raw, i) => {
+            const parts = String(raw).split(/\s+[—|]\s+(?=[^A-Za-z]*Email\s*:)/i);
+            return parts.map((part) => {
+                const text = stripBullet(part).replace(/^[^A-Za-z]+(?=(?:Phone|Email)\s*:)/i, '');
+                const match = text.match(label);
+                const source = ' data-source-line="' + esc(raw) + '"';
+                if (!match) return '<div class="pf-detail-row reveal"' + source + '><dd class="pf-detail-unlabelled">' + esc(part) + '</dd></div>';
+                return '<div class="pf-detail-row reveal"' + source + ' style="transition-delay:' + Math.min(i * 50, 250) + 'ms"><dt>' +
+                    esc(match[1]) + '</dt><dd>' + esc(match[2]) + '</dd></div>';
+            }).join('');
+        }).join('') + '</dl>';
+    }
+
+    function declarationHtml(section) {
+        const prose = [], rows = [], signature = [];
+        const lines = section.lines || [];
+        /* Only separate a PDF's fused right column when both cues exist.
+           Otherwise leave uncertain wording in its original field. */
+        const fused = lines.some((line) => /^Place\s*:\s*.+\s+Signature\s*$/i.test(line)) &&
+            lines.some((line) => /^Date\s*:\s*\d{1,4}[\/.-]\d{1,2}[\/.-]\d{2,4}\s+\S/i.test(line));
+        lines.forEach((raw) => {
+            const text = String(raw).trim();
+            const field = text.match(/^(Date|Place)\s*:\s*(.*)$/i);
+            if (field) {
+                let value = field[2];
+                if (fused && /^date$/i.test(field[1])) {
+                    const pair = value.match(/^(\d{1,4}[\/.-]\d{1,2}[\/.-]\d{2,4})\s+(.+)$/);
+                    if (pair) { value = pair[1]; signature.push('<span class="pf-signature-name">' + esc(pair[2]) + '</span>'); }
+                }
+                if (fused && /^place$/i.test(field[1])) {
+                    const pair = value.match(/^(.*?)\s+(Signature)\s*$/i);
+                    if (pair) { value = pair[1]; signature.push('<span>' + esc(pair[2]) + '</span>'); }
+                }
+                rows.push('<div class="pf-detail-row" data-source-line="' + esc(raw) + '"><dt>' + esc(field[1]) + '</dt><dd>' + esc(value) + '</dd></div>');
+            } else if (/^Signature\s*(?::|$)/i.test(text)) {
+                signature.push('<span>' + esc(text) + '</span>');
+            } else prose.push(raw);
+        });
+        let html = '<div class="pf-declaration"><div class="pf-lines">' + mergeBlocks(prose).map((text) =>
+            '<p class="pf-text reveal">' + esc(text) + '</p>').join('') + '</div>';
+        if (rows.length || signature.length) html += '<div class="pf-declaration-footer reveal">' +
+            (rows.length ? '<dl class="pf-details">' + rows.join('') + '</dl>' : '') +
+            (signature.length ? '<div class="pf-signature">' + signature.join('') + '</div>' : '') + '</div>';
+        return html + '</div>';
+    }
+
+
     function renderSectionContent(section) {
         const type = templateFor(section.type);
         const html = [];
 
-        if (section.type === 'projects') {
+        if (section.type === 'declaration') {
+            html.push(declarationHtml(section));
+        } else if (/^personal\s+(?:details|information)\s*:?$/i.test(section.original || '')) {
+            html.push(personalRows(section));
+        } else if (/^soft\s+skills\s*:?$/i.test(section.original || '')) {
+            html.push('<ul class="pf-soft-skills">' + tokenize(section.lines).map((text, i) =>
+                '<li class="reveal" style="transition-delay:' + Math.min(i * 50, 250) + 'ms">' + esc(text) + '</li>').join('') + '</ul>');
+        } else if (section.type === 'projects') {
             const entries = projectEntries(section);
             html.push('<div class="pf-project-grid">');
             entries.forEach((entry, i) => html.push(projectHtml(entry, i)));
@@ -528,7 +571,8 @@ const PortfolioGenerator = (function () {
                 '<h2 class="pf-section-title">' + esc(sec.original) + '</h2>' +
               '</div>'
             : '';
-        return '<section class="pf-section" id="' + id + '">' +
+        const stacked = ['skills', 'projects', 'certifications', 'certificate', 'certificates'].indexOf(sec.type) !== -1;
+        return '<section class="pf-section' + (stacked ? ' pf-stack' : '') + '" id="' + id + '">' +
             headHtml +
             '<div class="pf-section-body">' + renderSectionContent(sec) + '</div>' +
         '</section>';
@@ -689,7 +733,31 @@ const PortfolioGenerator = (function () {
 .pf-root a:focus-visible { outline: 3px solid var(--pf-accent); outline-offset: 4px; border-radius: 4px; }
 .pf-root .pf-entries-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); }
 .pf-root .pf-chip, .pf-root .pf-pill { max-width: 100%; }
+/* Resume-order layouts, shared by preview and offline export. */
+.pf-root .pf-stack .pf-skills, .pf-root .pf-stack .pf-project-grid, .pf-root .pf-stack .pf-entries-grid { grid-template-columns: minmax(0, 1fr); }
+.pf-root .pf-project-tech { margin: 12px 0; padding: 14px 0; border-top: 0; border-bottom: 1px solid var(--pf-border); }
+.pf-root .pf-project-description { flex: none; }
+.pf-root .pf-soft-skills { display: grid; gap: 10px; list-style: none; padding: 0; margin: 0; }
+.pf-root .pf-soft-skills li { padding: 14px 18px; border-left: 3px solid var(--pf-accent); border-radius: 0 10px 10px 0; background: var(--pf-surface); box-shadow: var(--pf-shadow); }
+.pf-root .pf-details { margin: 0; min-width: 0; }
+.pf-root .pf-detail-row { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr); gap: 10px 24px; padding: 14px 0; border-bottom: 1px solid var(--pf-border); }
+.pf-root .pf-detail-row dt { font-weight: 600; color: var(--pf-muted); }
+.pf-root .pf-detail-row dt, .pf-root .pf-detail-row dd { min-width: 0; overflow-wrap: anywhere; }
+.pf-root .pf-detail-row dd { margin: 0; color: var(--pf-text); }
+.pf-root .pf-detail-row .pf-detail-unlabelled { grid-column: 1 / -1; }
+.pf-root .pf-declaration-footer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 24px; margin-top: 26px; }
+.pf-root .pf-signature { display: grid; gap: 8px; text-align: right; color: var(--pf-muted); padding: 14px 0; }
+.pf-root .pf-signature-name { font-weight: 600; color: var(--pf-text); }
+@media (hover:hover) and (prefers-reduced-motion:no-preference) {
+.pf-root .pf-soft-skills li.visible:hover { transform: translateX(4px); }
+}
+@media(max-width:480px) {
+.pf-root .pf-detail-row, .pf-root .pf-declaration-footer { grid-template-columns: minmax(0, 1fr); }
+.pf-root .pf-signature { text-align: left; }
+}
 @media(max-width:640px) {
+.pf-root .pf-declaration-footer { grid-template-columns: minmax(0, 1fr); }
+.pf-root .pf-signature { text-align: left; }
 .pf-root .pf-project-grid, .pf-root .pf-skills { grid-template-columns: minmax(0, 1fr); }
 .pf-root .pf-project { padding: 20px; }
 .pf-root .pf-section { padding: 28px 16px; }

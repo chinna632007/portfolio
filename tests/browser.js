@@ -42,6 +42,25 @@ function checkEditor(sample) {
             const grid = document.querySelector('.pf-project-grid');
             results.columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
             results.overflow = grid.scrollWidth > grid.clientWidth;
+            const fixture = document.createElement('div');
+            fixture.innerHTML = PortfolioGenerator.render({ personalInfo: {}, sections: [
+                { type: 'skills', original: 'Soft Skills', lines: ['Communication • Teamwork • Adaptability'] },
+                { type: 'certifications', original: 'Certifications', lines: ['• Completed a course.', '• Received an award.'] },
+                { type: 'contact', original: 'Personal Details', lines: ['Name Example Person', 'Languages Known English, Telugu'] },
+                { type: 'declaration', original: 'Declaration', lines: ['I declare this correct.', 'Date: 02/09/2026 Example Person', 'Place: Sample City Signature'] }
+            ] }, {});
+            document.body.appendChild(fixture);
+            const soft = fixture.querySelectorAll('.pf-soft-skills li');
+            results.softCount = soft.length;
+            results.softVertical = soft[1].getBoundingClientRect().top > soft[0].getBoundingClientRect().bottom;
+            results.certificateColumns = getComputedStyle(fixture.querySelector('.pf-entries-grid')).gridTemplateColumns.split(' ').length;
+            results.personalLabels = Array.from(fixture.querySelectorAll('.pf-details dt')).map(el => el.textContent);
+            results.signature = fixture.querySelector('.pf-signature-name').textContent;
+            results.detailsOverflow = Array.from(fixture.querySelectorAll('.pf-detail-row')).some(el => el.scrollWidth > el.clientWidth);
+            results.overflowDetail = Array.from(fixture.querySelectorAll('.pf-detail-row'))
+                .filter(el => el.scrollWidth > el.clientWidth)
+                .map(el => ({ text: el.textContent.slice(0, 60), client: el.clientWidth, scroll: el.scrollWidth }));
+            fixture.remove();
         } catch (e) { results.error = e.message; }
         const report = document.createElement('pre');
         report.id = 'browser-report';
@@ -72,8 +91,14 @@ try {
         assert.strictEqual(result.heading, 'first project');
         assert(result.separatorsKept && result.titleBeforeDate && result.dateBeforeDescription);
         assert(!result.previewError && !result.overflow);
-        if (width === 500) assert.strictEqual(result.columns, 1);
-        console.log('PASS browser editor clear/restore, heading order, and layout at ' + width + 'px');
+        assert.strictEqual(result.columns, 1);
+        assert.strictEqual(result.softCount, 3);
+        assert(result.softVertical, 'Soft skills must stack vertically: ' + JSON.stringify(result));
+        assert(!result.detailsOverflow, 'Detail rows must not overflow: ' + JSON.stringify(result));
+        assert.strictEqual(result.certificateColumns, 1);
+        assert.deepStrictEqual(result.personalLabels, ['Name', 'Languages Known', 'Date', 'Place']);
+        assert.strictEqual(result.signature, 'Example Person');
+        console.log('PASS browser editor, source order, vertical sections, declaration, and layout at ' + width + 'px');
     }
 } finally {
     fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
