@@ -875,7 +875,16 @@ const PortfolioGenerator = (function () {
         '@media print{.pf-nav,.pf-hero-bg{display:none;}}';
 
 /* ---------- preview page controller (wired after the preview view shows) ---------- */
+    let previewListeners = [];
+    function listen(target, event, handler) {
+        if (!target) return;
+        target.addEventListener(event, handler);
+        previewListeners.push(() => target.removeEventListener(event, handler));
+    }
+
     function initPreviewPage() {
+        previewListeners.forEach((remove) => remove());
+        previewListeners = [];
         const frame = document.getElementById('portfolioPreview');
         const data = App.getData();
         if (!frame) return;
@@ -885,11 +894,32 @@ const PortfolioGenerator = (function () {
             return;
         }
         const custom = App.getCustom();
+        const previewView = document.getElementById('view-preview');
+        if (previewView && !previewView.classList.contains('active')) App.show('view-preview');
+
+        /* The disclosure works at every width; new previews start expanded. */
+        const panelToggle = document.getElementById('panelToggle');
+        const panelContent = document.getElementById('panelContent');
+        function setPanelExpanded(expanded) {
+            if (!panelToggle || !panelContent) return;
+            panelContent.hidden = !expanded;
+            panelToggle.setAttribute('aria-expanded', String(expanded));
+            panelToggle.textContent = expanded ? 'Hide' : 'Show';
+            panelToggle.setAttribute('aria-label', (expanded ? 'Hide' : 'Show') + ' customization options');
+        }
+        setPanelExpanded(true);
+        listen(panelToggle, 'click', () => setPanelExpanded(panelContent.hidden));
 
         function paint() {
+            const scrollRoot = frame.closest('.pf-preview-scroll') || frame;
+            const previewTop = scrollRoot.scrollTop;
+            const panelTop = panelContent ? panelContent.scrollTop : 0;
+            const scrollBehavior = scrollRoot.style.scrollBehavior;
             try {
+                // Replacing preview content must not animate a reset to the top.
+                scrollRoot.style.scrollBehavior = 'auto';
                 frame.innerHTML = buildPortfolioHtml(data, custom);
-                const scrollRoot = frame.closest('.pf-preview-scroll') || frame;
+                scrollRoot.scrollTop = Math.min(previewTop, Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight));
                 Animations.initReveal(frame);
                 Animations.initPortfolioNav(scrollRoot, frame.querySelector('.pf-nav'));
                 Animations.initScrollProgress(scrollRoot, frame.querySelector('.pf-progress span'));
@@ -898,6 +928,9 @@ const PortfolioGenerator = (function () {
                 console.error('Portfolio preview render error', err);
                 frame.innerHTML = '<div class="preview-empty"><h2>Preview could not be rendered</h2>' +
                     '<p>' + esc(err && err.message ? err.message : 'unknown error') + '</p></div>';
+            } finally {
+                scrollRoot.style.scrollBehavior = scrollBehavior;
+                if (panelContent) panelContent.scrollTop = panelTop;
             }
         }
 
@@ -908,7 +941,7 @@ const PortfolioGenerator = (function () {
 
         function bindRadios(name, apply) {
             const radios = document.querySelectorAll('input[name="' + name + '"]');
-            radios.forEach((r) => r.addEventListener('change', () => {
+            radios.forEach((r) => listen(r, 'change', () => {
                 if (!r.checked) return;
                 apply(r.value); App.saveCustom(custom); paint();
             }));
@@ -1009,17 +1042,17 @@ const PortfolioGenerator = (function () {
 
         if (editModal) {
             const close = () => { editModal.hidden = true; editModal.setAttribute('aria-hidden', 'true'); document.body.classList.remove('modal-open'); };
-            document.getElementById('editDataBtn').addEventListener('click', () => {
+            listen(document.getElementById('editDataBtn'), 'click', () => {
                 editBody.innerHTML = buildEditForm();
                 editModal.hidden = false;
                 editModal.setAttribute('aria-hidden', 'false');
                 document.body.classList.add('modal-open');
             });
-            document.getElementById('editModalClose').addEventListener('click', close);
-            document.getElementById('editCancel').addEventListener('click', close);
-            editModal.addEventListener('click', (e) => { if (e.target === editModal) close(); });
-            document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !editModal.hidden) close(); });
-            document.getElementById('editSave').addEventListener('click', saveEditForm);
+            listen(document.getElementById('editModalClose'), 'click', close);
+            listen(document.getElementById('editCancel'), 'click', close);
+            listen(editModal, 'click', (e) => { if (e.target === editModal) close(); });
+            listen(document, 'keydown', (e) => { if (e.key === 'Escape' && !editModal.hidden) close(); });
+            listen(document.getElementById('editSave'), 'click', saveEditForm);
         }
 
         /* --- export standalone / back / reset --- */
@@ -1034,13 +1067,12 @@ const PortfolioGenerator = (function () {
             setTimeout(() => URL.revokeObjectURL(a.href), 1500);
             App.toast('Portfolio downloaded!', 'success');
         };
-        document.getElementById('exportBtn').addEventListener('click', exportHtml);
-        const dlBtn = document.getElementById('downloadBtn');
-        if (dlBtn) dlBtn.addEventListener('click', exportHtml);
-        document.getElementById('backBtn').addEventListener('click', () => {
+        listen(document.getElementById('exportBtn'), 'click', exportHtml);
+        listen(document.getElementById('downloadBtn'), 'click', exportHtml);
+        listen(document.getElementById('backBtn'), 'click', () => {
             App.show('view-home');
         });
-        document.getElementById('resetBtn').addEventListener('click', () => {
+        listen(document.getElementById('resetBtn'), 'click', () => {
             if (confirm('Start over? Your uploaded resume data will be removed.')) {
                 App.clearData();
                 localStorage.removeItem(App.KEYS.CUSTOM);

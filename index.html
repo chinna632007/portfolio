@@ -12,7 +12,7 @@
      so parsing works offline, over file:// and without any CDN). -->
 <script src="lib/pdf.min.js?v=20260909"></script>
 <script src="lib/mammoth.browser.min.js?v=20260909"></script>
-<link rel="stylesheet" href="css/style.css?v=20260916">
+<link rel="stylesheet" href="css/style.css?v=20260917-sidebar-scroll2">
 </head>
 <body>
 
@@ -98,10 +98,10 @@
     <section class="view" id="view-preview">
         <div class="preview-layout">
             <!-- Customization panel -->
-            <aside class="customization-panel" id="customizationPanel">
+            <aside class="customization-panel" id="customizationPanel" aria-labelledby="customizationTitle">
                 <div class="panel-header">
-                    <h3>&#9881; Customize</h3>
-                    <button class="panel-toggle" id="panelToggle" aria-label="Toggle panel">&#9776;</button>
+                    <div><h3 id="customizationTitle">&#9881; Customize</h3><p class="panel-subtitle">Changes update your preview instantly.</p></div>
+                    <button type="button" class="panel-toggle" id="panelToggle" aria-controls="panelContent" aria-expanded="true" aria-label="Hide customization options">Hide</button>
                 </div>
                 <div class="panel-content" id="panelContent">
 
@@ -116,12 +116,12 @@
                     <div class="customization-group">
                         <h4>Accent Color</h4>
                         <div class="color-options">
-                            <label class="color-option" data-v="indigo"><input type="radio" name="color" value="indigo" checked><span style="background:#6366f1"></span></label>
-                            <label class="color-option" data-v="blue"><input type="radio" name="color" value="blue"><span style="background:#3b82f6"></span></label>
-                            <label class="color-option" data-v="emerald"><input type="radio" name="color" value="emerald"><span style="background:#10b981"></span></label>
-                            <label class="color-option" data-v="rose"><input type="radio" name="color" value="rose"><span style="background:#f43f5e"></span></label>
-                            <label class="color-option" data-v="amber"><input type="radio" name="color" value="amber"><span style="background:#f59e0b"></span></label>
-                            <label class="color-option" data-v="purple"><input type="radio" name="color" value="purple"><span style="background:#8b5cf6"></span></label>
+                            <label class="color-option" data-v="indigo" title="Indigo"><input type="radio" name="color" value="indigo" aria-label="Indigo" checked><span style="background:#6366f1"></span></label>
+                            <label class="color-option" data-v="blue" title="Blue"><input type="radio" name="color" value="blue" aria-label="Blue"><span style="background:#3b82f6"></span></label>
+                            <label class="color-option" data-v="emerald" title="Emerald"><input type="radio" name="color" value="emerald" aria-label="Emerald"><span style="background:#10b981"></span></label>
+                            <label class="color-option" data-v="rose" title="Rose"><input type="radio" name="color" value="rose" aria-label="Rose"><span style="background:#f43f5e"></span></label>
+                            <label class="color-option" data-v="amber" title="Amber"><input type="radio" name="color" value="amber" aria-label="Amber"><span style="background:#f59e0b"></span></label>
+                            <label class="color-option" data-v="purple" title="Purple"><input type="radio" name="color" value="purple" aria-label="Purple"><span style="background:#8b5cf6"></span></label>
                         </div>
                     </div>
 
@@ -202,7 +202,7 @@
 <!-- App scripts (order matters) -->
 <script src="js/app.js?v=20260916"></script>
 <script src="js/resumeAnalyzer.js?v=20260916-projects2"></script>
-<script src="js/portfolioGenerator.js?v=20260916-projects2"></script>
+<script src="js/portfolioGenerator.js?v=20260917-sidebar-scroll2"></script>
 <script src="js/pdfParser.js?v=20260916"></script>
 <script src="js/docxParser.js?v=20260916"></script>
 <script src="js/upload.js?v=20260916"></script>

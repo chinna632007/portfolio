@@ -13,12 +13,20 @@ if (!fs.existsSync(browser)) throw new Error('Set BROWSER_PATH to an installed C
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'portfolio-regression-'));
 const sample = fs.readFileSync(path.join(__dirname, 'samples/resumeA.txt'), 'utf8');
 function checkEditor(sample) {
-    window.addEventListener('load', function () {
+    window.addEventListener('load', async function () {
         const results = {};
         try {
             App.saveData(ResumeAnalyzer.analyze(sample, 'resumeA.txt'));
             App.show('view-preview');
             PortfolioGenerator.initPreviewPage();
+            const panelToggle = document.getElementById('panelToggle');
+            const panelContent = document.getElementById('panelContent');
+            results.panelLinked = panelToggle.getAttribute('aria-controls') === panelContent.id;
+            panelToggle.click();
+            results.panelClosed = panelContent.hidden && getComputedStyle(panelContent).display === 'none' &&
+                panelToggle.getAttribute('aria-expanded') === 'false';
+            panelToggle.click();
+            results.panelOpened = !panelContent.hidden && panelToggle.getAttribute('aria-expanded') === 'true';
             const projectsField = () => Array.from(document.querySelectorAll('.edit-section'))
                 .find(el => el.querySelector('[data-title]').value === 'Projects').querySelector('textarea');
             document.getElementById('editDataBtn').click();
@@ -61,6 +69,81 @@ function checkEditor(sample) {
                 .filter(el => el.scrollWidth > el.clientWidth)
                 .map(el => ({ text: el.textContent.slice(0, 60), client: el.clientWidth, scroll: el.scrollWidth }));
             fixture.remove();
+
+            // Reopening/re-generating must replace handlers, not accumulate them.
+            const next = App.getData();
+            next.personalInfo.name = 'Latest Resume';
+            next.sections.push({ type: 'generic', original: 'LongSection'.repeat(25), lines: ['Kept verbatim.'] });
+            App.saveData(next);
+            PortfolioGenerator.initPreviewPage();
+            PortfolioGenerator.initPreviewPage();
+            let saves = 0;
+            const saveCustom = App.saveCustom;
+            App.saveCustom = function (custom) { saves++; saveCustom.call(App, custom); };
+            document.querySelector('input[name="theme"][value="dark"]').click();
+            document.querySelector('input[name="color"][value="rose"]').click();
+            document.querySelector('input[name="layout"][value="minimal"]').click();
+            results.singleRadioHandlers = saves === 3;
+            results.customSaved = App.getCustom().theme === 'dark' && App.getCustom().color === 'rose' && App.getCustom().layout === 'minimal';
+            const section = document.querySelector('#sectionToggles input');
+            const original = App.getData().sections[0].original;
+            section.click();
+            results.sectionHidden = App.getCustom().hidden.includes(original);
+            section.click();
+            results.sectionRestored = !App.getCustom().hidden.includes(original);
+            App.saveCustom = saveCustom;
+            panelToggle.click();
+            results.singleToggleHandler = panelContent.hidden;
+            panelToggle.click();
+            results.toggleVisible = getComputedStyle(panelToggle).display !== 'none';
+            results.sidebarOverflow = panelContent.scrollWidth > panelContent.clientWidth;
+            const headerTop = document.querySelector('.panel-header').getBoundingClientRect().top;
+            panelContent.scrollTop = panelContent.scrollHeight;
+            const contentRect = panelContent.getBoundingClientRect();
+            const resetRect = document.getElementById('resetBtn').getBoundingClientRect();
+            results.actionsReachable = resetRect.bottom <= contentRect.bottom + 1 && resetRect.top >= contentRect.top;
+            results.headerStable = document.querySelector('.panel-header').getBoundingClientRect().top === headerTop;
+            results.panelBounded = document.getElementById('customizationPanel').getBoundingClientRect().height < window.innerHeight;
+            let downloads = 0, prompts = 0;
+            const anchorClick = HTMLAnchorElement.prototype.click;
+            const confirm = window.confirm;
+            HTMLAnchorElement.prototype.click = function () { downloads++; };
+            window.confirm = function () { prompts++; return false; };
+            document.getElementById('downloadBtn').click();
+            document.getElementById('resetBtn').click();
+            HTMLAnchorElement.prototype.click = anchorClick;
+            window.confirm = confirm;
+            results.singleActions = downloads === 1 && prompts === 1;
+            document.getElementById('editDataBtn').click();
+            results.latestData = document.querySelector('[data-personal="name"]').value === 'Latest Resume';
+            document.getElementById('editCancel').click();
+
+            // A click on a real label focuses its input before change fires.
+            // input.click() alone misses the browser's focus-induced scrolling.
+            document.documentElement.style.scrollBehavior = 'auto';
+            const previewScroll = document.getElementById('previewScroll');
+            previewScroll.style.scrollBehavior = 'auto';
+            await new Promise(resolve => setTimeout(resolve, 400));
+            const row = document.querySelectorAll('.section-toggle')[2];
+            const input = row.querySelector('input');
+            const panelRect = panelContent.getBoundingClientRect();
+            panelContent.scrollTop += row.getBoundingClientRect().top - panelRect.top - 80;
+            previewScroll.scrollTop = 250;
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const before = { panel: panelContent.scrollTop, page: window.scrollY, preview: previewScroll.scrollTop };
+            const rowRect = row.getBoundingClientRect(), inputRect = input.getBoundingClientRect();
+            results.sectionFocusInsideRow = inputRect.top >= rowRect.top && inputRect.bottom <= rowRect.bottom &&
+                inputRect.left >= rowRect.left && inputRect.right <= rowRect.right;
+            input.focus();
+            row.querySelector('.toggle-label').click();
+            await new Promise(resolve => setTimeout(resolve, 150));
+            results.sectionClickStable = !panelContent.hidden && panelToggle.getAttribute('aria-expanded') === 'true' &&
+                Math.abs(panelContent.scrollTop - before.panel) <= 1 && Math.abs(window.scrollY - before.page) <= 1;
+            results.previewPositionKept = Math.abs(previewScroll.scrollTop - before.preview) <= 1;
+            results.scrollDebug = { before, after: { panel: panelContent.scrollTop, page: window.scrollY, preview: previewScroll.scrollTop } };
+            input.click(); // re-activate the focused native checkbox without rebuilding the sidebar
+            await new Promise(resolve => setTimeout(resolve, 100));
+            results.sectionFocusKept = document.activeElement === input && !panelContent.hidden;
         } catch (e) { results.error = e.message; }
         const report = document.createElement('pre');
         report.id = 'browser-report';
@@ -74,7 +157,7 @@ try {
     html = html.replace('</body>', '<script>(' + checkEditor.toString() + ')(' + JSON.stringify(sample) + ');</script></body>');
     const fixture = path.join(temp, 'editor.html');
     fs.writeFileSync(fixture, html);
-    for (const width of [1200, 500]) {
+    for (const width of [1200, 980, 500]) {
         const run = spawnSync(browser, ['--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
             '--user-data-dir=' + path.join(temp, 'profile-' + width), '--window-size=' + width + ',900',
             '--virtual-time-budget=5000', '--dump-dom', pathToFileURL(fixture).href], { encoding: 'utf8', timeout: 30000, maxBuffer: 5 * 1024 * 1024 });
@@ -83,6 +166,7 @@ try {
         assert(match, 'Browser did not produce a result: ' + run.stderr);
         const result = JSON.parse(match[1]);
         assert(!result.error, result.error);
+        assert(result.panelLinked && result.panelClosed && result.panelOpened, 'Sidebar disclosure must work');
         assert.strictEqual(result.sectionsBefore, 5);
         assert.strictEqual(result.sectionsAfter, 5);
         assert.strictEqual(result.projectSections, 1);
@@ -98,7 +182,12 @@ try {
         assert.strictEqual(result.certificateColumns, 1);
         assert.deepStrictEqual(result.personalLabels, ['Name', 'Languages Known', 'Date', 'Place']);
         assert.strictEqual(result.signature, 'Example Person');
-        console.log('PASS browser editor, source order, vertical sections, declaration, and layout at ' + width + 'px');
+        assert(result.singleRadioHandlers && result.customSaved && result.singleToggleHandler && result.singleActions && result.latestData, 'Repeated generation must use only current handlers: ' + JSON.stringify(result));
+        assert(result.sectionHidden && result.sectionRestored, 'Section switches must persist visibility');
+        assert(result.toggleVisible && !result.sidebarOverflow && result.actionsReachable && result.headerStable && result.panelBounded, 'Sidebar layout must remain usable: ' + JSON.stringify(result));
+        assert(result.sectionFocusInsideRow && result.sectionClickStable && result.previewPositionKept && result.sectionFocusKept,
+            'Section interaction must not jump or collapse: ' + JSON.stringify(result));
+        console.log('PASS browser sidebar, repeated generation, editor, source order, vertical sections, declaration, and layout at ' + width + 'px');
     }
 } finally {
     fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
