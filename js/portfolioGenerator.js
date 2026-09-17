@@ -647,11 +647,19 @@ const PortfolioGenerator = (function () {
             '<div class="pf-progress" aria-hidden="true"><span></span></div></div></nav>';
     }
 
+    /* One class builder for live appearance updates and exported portfolios. */
+    function appearanceClasses(custom) {
+        const pick = (value, allowed) => allowed.includes(value) ? value : allowed[0];
+        return 'pf-root pf-' + pick(custom.theme, ['light', 'dark']) +
+            ' pf-' + pick(custom.color, ['indigo', 'blue', 'emerald', 'rose', 'amber', 'purple']) +
+            ' pf-' + pick(custom.layout, ['modern', 'minimal', 'professional']);
+    }
+
     /* ---------- full preview HTML ---------- */
     function buildPortfolioHtml(data, custom) {
         custom = custom || {};
         const parts = [];
-        parts.push('<div class="pf-root pf-' + (custom.theme || 'light') + ' pf-' + (custom.color || 'indigo') + ' pf-' + (custom.layout || 'modern') + '">');
+        parts.push('<div class="' + appearanceClasses(custom) + '">');
         parts.push('<style>' + PORTFOLIO_LAYOUT_CSS + '</style>');
         parts.push(buildNav(data, custom));
         parts.push('<div class="pf-hero-wrap">' + buildHero(data, custom) + '</div>');
@@ -708,7 +716,9 @@ const PortfolioGenerator = (function () {
        use exactly the same responsive project/section design. */
     const PORTFOLIO_LAYOUT_CSS = `
 .pf-root *, .pf-root *::before, .pf-root *::after { box-sizing: border-box; }
-.pf-root { overflow-wrap: anywhere; }
+.pf-root { overflow-wrap: anywhere; background: var(--pf-bg); color: var(--pf-text); line-height: 1.6; min-height: 100vh; }
+.pf-root.pf-light { color-scheme: light; }
+.pf-root.pf-dark { color-scheme: dark; }
 .pf-root .pf-section { padding-top: 40px; padding-bottom: 40px; scroll-margin-top: 85px; }
 .pf-root .pf-section + .pf-section { border-top: 1px solid var(--pf-border); }
 .pf-root .pf-section-head { flex-wrap: wrap; }
@@ -764,6 +774,28 @@ const PortfolioGenerator = (function () {
 .pf-root .pf-section-head { gap: 8px; }
 .pf-root .pf-section-title { font-size: 1.35rem; }
 }
+/* Distinct templates share all content and never override the chosen palette. */
+.pf-root.pf-minimal { --pf-radius: 4px; --pf-shadow: none; }
+.pf-root.pf-minimal .pf-hero { text-align: left; background: var(--pf-surface); border-bottom: 1px solid var(--pf-border); padding: 40px 24px; }
+.pf-root.pf-minimal .pf-hero-bg { display: none; }
+.pf-root.pf-minimal .pf-hero-inner { max-width: 772px; margin: auto; }
+.pf-root.pf-minimal .pf-hero-avatar { margin-left: 0; width: 54px; height: 54px; border-radius: 4px; box-shadow: none; }
+.pf-root.pf-minimal .pf-hero-name { background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.pf-root.pf-minimal .pf-hero-pills { justify-content: flex-start; }
+.pf-root.pf-minimal .pf-hero-intro { margin-left: 0; }
+.pf-root.pf-minimal .pf-entry, .pf-root.pf-minimal .pf-skill-group { box-shadow: none; border-radius: 4px; }
+.pf-root.pf-minimal .pf-section-title { font-size: 1.25rem; font-weight: 600; }
+.pf-root.pf-professional { --pf-radius: 8px; }
+.pf-root.pf-professional .pf-hero { text-align: left; padding: 44px 24px; border-top: 8px solid var(--pf-accent); border-bottom: 1px solid var(--pf-border); background: var(--pf-accent-soft); }
+.pf-root.pf-professional .pf-hero-bg { display: none; }
+.pf-root.pf-professional .pf-hero-inner { max-width: 832px; margin: auto; }
+.pf-root.pf-professional .pf-hero-avatar { margin-left: 0; border-radius: 8px; }
+.pf-root.pf-professional .pf-hero-name { background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-professional .pf-hero-intro { margin-left: 0; }
+.pf-root.pf-professional .pf-hero-pills { justify-content: flex-start; }
+.pf-root.pf-professional .pf-section-head { padding: 14px; border-left: 4px solid var(--pf-accent); background: var(--pf-accent-soft); }
+.pf-root.pf-professional .pf-entry, .pf-root.pf-professional .pf-skill-group { border-radius: 8px; box-shadow: none; }
+.pf-root.pf-professional .pf-section-title { font-size: 1.25rem; }
 @media(prefers-reduced-motion:reduce) {
 .pf-root *, .pf-root *::before, .pf-root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 .pf-root .reveal { opacity: 1; transform: none; }
@@ -861,7 +893,7 @@ const PortfolioGenerator = (function () {
         '.pf-footer-meta{font-size:.82rem;margin:0;}' +
         '.pf-scroll-top{display:inline-block;margin-top:12px;color:var(--pf-accent);text-decoration:none;font-size:.85rem;font-weight:600;}' +
         '.pf-root.pf-minimal .pf-section{max-width:820px;}.pf-root.pf-minimal .pf-entry{box-shadow:none;}.pf-root.pf-minimal .pf-hero{padding:60px 22px;}' +
-        '.pf-root.pf-professional{--pf-accent:#1d4ed8;--pf-accent-2:#2563eb;}.pf-root.pf-professional .pf-section-title{text-transform:uppercase;letter-spacing:.6px;font-size:1.25rem;}.pf-root.pf-professional .pf-section{max-width:880px;}' +
+        '.pf-root.pf-professional{font-size:1.02rem;}.pf-root.pf-professional .pf-section-title{text-transform:uppercase;letter-spacing:.6px;font-size:1.25rem;}.pf-root.pf-professional .pf-section{max-width:880px;}' +
         '.pf-root.pf-modern .pf-section-title{font-size:1.6rem;}' +
         '.pf-root .reveal{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.22,1,.36,1),transform .6s cubic-bezier(.22,1,.36,1);}' +
         '.pf-root .reveal.visible{opacity:1;transform:none;}' +
@@ -943,7 +975,12 @@ const PortfolioGenerator = (function () {
             const radios = document.querySelectorAll('input[name="' + name + '"]');
             radios.forEach((r) => listen(r, 'change', () => {
                 if (!r.checked) return;
-                apply(r.value); App.saveCustom(custom); paint();
+                apply(r.value);
+                // Appearance is CSS-driven: keep content, focus, and reveal state intact.
+                const root = frame.querySelector('.pf-root');
+                if (root) root.className = appearanceClasses(custom);
+                else paint();
+                App.saveCustom(custom);
             }));
         }
         bindRadios('theme', (v) => custom.theme = v);

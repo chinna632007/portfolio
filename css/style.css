@@ -207,6 +207,23 @@ ul { list-style: none; }
 .color-option span { display: block; width: 34px; height: 34px; border-radius: 50%; transition: transform .18s ease; box-shadow: 0 3px 8px rgba(15,23,42,.2); }
 .color-option input:checked + span { transform: scale(1.2); box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--accent), 0 6px 14px rgba(15,23,42,.3); }
 
+.template-options { display: grid; gap: 10px; }
+.template-option { position: relative; min-width: 0; cursor: pointer; }
+.template-option input { position: absolute; left: 12px; top: 12px; width: 16px; height: 16px; opacity: 0; }
+.template-card { display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid var(--line); border-radius: 12px; background: var(--surface); }
+.template-card strong, .template-card small { display: block; }
+.template-card strong { font-size: .85rem; }
+.template-card small { font-size: .73rem; line-height: 1.4; margin-top: 4px; color: var(--muted); }
+.template-option input:checked + .template-card { border-color: var(--accent); background: var(--accent-soft); }
+.template-option input:focus-visible + .template-card { outline: 3px solid var(--accent); outline-offset: 3px; }
+.template-thumb { flex: none; display: grid; gap: 5px; width: 54px; height: 62px; padding: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; }
+.template-thumb i { display: block; background: var(--accent); opacity: .45; border-radius: 3px; }
+.template-thumb-modern i:first-child { width: 18px; border-radius: 50%; justify-self: center; opacity: 1; }
+.template-thumb-minimal { background: var(--surface); }
+.template-thumb-minimal i { height: 3px; border-radius: 0; align-self: center; }
+.template-thumb-professional { border-top: 8px solid var(--accent); }
+.template-thumb-professional i { border-radius: 0; border-left: 3px solid var(--accent); }
+
 .section-toggle-list { display: grid; gap: 8px; }
 .section-toggle { position: relative; display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: .86rem; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; }
 /* Keep the native focus target INSIDE its row, even after the panel scrolls.
@@ -465,7 +482,7 @@ body.modal-open { overflow: hidden; }
 .pf-root.pf-minimal .pf-section { max-width: 820px; }
 .pf-root.pf-minimal .pf-entry { box-shadow: none; }
 .pf-root.pf-minimal .pf-hero { padding: 60px 22px; }
-.pf-root.pf-professional { --pf-accent: #1d4ed8; --pf-accent-2: #2563eb; font-size: 1.02rem; }
+.pf-root.pf-professional { font-size: 1.02rem; }
 .pf-root.pf-professional .pf-section-title { text-transform: uppercase; letter-spacing: .6px; font-size: 1.25rem; }
 .pf-root.pf-professional .pf-section { max-width: 880px; }
 .pf-root.pf-modern .pf-section-title { font-size: 1.6rem; }

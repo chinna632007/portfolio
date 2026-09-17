@@ -144,6 +144,56 @@ function checkEditor(sample) {
             input.click(); // re-activate the focused native checkbox without rebuilding the sidebar
             await new Promise(resolve => setTimeout(resolve, 100));
             results.sectionFocusKept = document.activeElement === input && !panelContent.hidden;
+
+            // End-to-end appearance check: operate the actual sidebar controls.
+            document.querySelector('input[name="theme"][value="dark"]').click();
+            document.querySelector('input[name="color"][value="rose"]').click();
+            document.querySelector('input[name="layout"][value="professional"]').click();
+            const appearanceRoot = document.querySelector('#portfolioPreview .pf-root');
+            const appearanceStyle = getComputedStyle(appearanceRoot);
+            results.appearance = {
+                classes: appearanceRoot.className,
+                background: appearanceStyle.backgroundColor,
+                text: appearanceStyle.color,
+                accent: appearanceStyle.getPropertyValue('--pf-accent').trim(),
+                surface: getComputedStyle(appearanceRoot.querySelector('.pf-entry')).backgroundColor,
+                projectBorder: getComputedStyle(appearanceRoot.querySelector('.pf-project')).borderTopColor
+            };
+            const exported = document.createElement('iframe');
+            const exportLoaded = new Promise(resolve => exported.onload = resolve);
+            exported.srcdoc = PortfolioGenerator.buildStandalone(App.getData(), App.getCustom());
+            document.body.appendChild(exported);
+            await exportLoaded;
+            const exportRoot = exported.contentDocument.querySelector('.pf-root');
+            const exportStyle = exported.contentWindow.getComputedStyle(exportRoot);
+            results.exportAppearance = { classes: exportRoot.className, background: exportStyle.backgroundColor,
+                text: exportStyle.color, accent: exportStyle.getPropertyValue('--pf-accent').trim() };
+            exported.remove();
+            const sourceBefore = JSON.stringify(App.getData());
+            const contentBefore = Array.from(appearanceRoot.querySelectorAll('.pf-section')).map(el => el.textContent).join('|');
+            results.templateStyles = [];
+            results.paletteMatrix = true;
+            const palette = { indigo: '#6366f1', blue: '#3b82f6', emerald: '#10b981', rose: '#f43f5e', amber: '#f59e0b', purple: '#8b5cf6' };
+            for (const layout of ['modern', 'minimal', 'professional']) {
+                document.querySelector('input[name="layout"][value="' + layout + '"]').closest('label').querySelector('strong').click();
+                const heroStyle = getComputedStyle(appearanceRoot.querySelector('.pf-hero'));
+                results.templateStyles.push([heroStyle.textAlign, heroStyle.borderTopWidth,
+                    getComputedStyle(appearanceRoot.querySelector('.pf-hero-avatar')).borderRadius].join('|'));
+                for (const theme of ['light', 'dark']) {
+                    document.querySelector('input[name="theme"][value="' + theme + '"]').click();
+                    for (const color of Object.keys(palette)) {
+                        document.querySelector('input[name="color"][value="' + color + '"]').closest('label').querySelector('span').click();
+                        const style = getComputedStyle(appearanceRoot);
+                        results.paletteMatrix = results.paletteMatrix && style.getPropertyValue('--pf-accent').trim() === palette[color] &&
+                            style.backgroundColor === (theme === 'dark' ? 'rgb(11, 18, 32)' : 'rgb(248, 250, 252)');
+                    }
+                }
+            }
+            results.appearanceKeepsContent = appearanceRoot === document.querySelector('#portfolioPreview .pf-root') &&
+                contentBefore === Array.from(appearanceRoot.querySelectorAll('.pf-section')).map(el => el.textContent).join('|') &&
+                sourceBefore === JSON.stringify(App.getData());
+            PortfolioGenerator.initPreviewPage();
+            results.appearanceRestored = document.querySelector('#portfolioPreview .pf-root').className === 'pf-root pf-dark pf-purple pf-professional';
         } catch (e) { results.error = e.message; }
         const report = document.createElement('pre');
         report.id = 'browser-report';
@@ -187,7 +237,16 @@ try {
         assert(result.toggleVisible && !result.sidebarOverflow && result.actionsReachable && result.headerStable && result.panelBounded, 'Sidebar layout must remain usable: ' + JSON.stringify(result));
         assert(result.sectionFocusInsideRow && result.sectionClickStable && result.previewPositionKept && result.sectionFocusKept,
             'Section interaction must not jump or collapse: ' + JSON.stringify(result));
-        console.log('PASS browser sidebar, repeated generation, editor, source order, vertical sections, declaration, and layout at ' + width + 'px');
+        assert.strictEqual(result.appearance.background, 'rgb(11, 18, 32)', 'Dark preview background');
+        assert.strictEqual(result.appearance.text, 'rgb(230, 237, 247)', 'Dark preview text');
+        assert.strictEqual(result.appearance.accent, '#f43f5e', 'Professional must respect Rose');
+        assert.strictEqual(result.appearance.projectBorder, 'rgb(244, 63, 94)', 'Visible Rose project border');
+        assert.strictEqual(result.exportAppearance.background, result.appearance.background, 'Export must match dark preview');
+        assert.strictEqual(result.exportAppearance.text, result.appearance.text, 'Export text must match preview');
+        assert.strictEqual(result.exportAppearance.accent, result.appearance.accent, 'Export accent must match preview');
+        assert(result.paletteMatrix && result.appearanceKeepsContent && result.appearanceRestored, 'All palettes/templates must apply without replacing resume content');
+        assert.strictEqual(new Set(result.templateStyles).size, 3, 'Templates must have visibly distinct layouts');
+        console.log('PASS browser sidebar, appearance, export, repeated generation, and layout at ' + width + 'px');
     }
 } finally {
     fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

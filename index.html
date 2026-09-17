@@ -12,7 +12,7 @@
      so parsing works offline, over file:// and without any CDN). -->
 <script src="lib/pdf.min.js?v=20260909"></script>
 <script src="lib/mammoth.browser.min.js?v=20260909"></script>
-<link rel="stylesheet" href="css/style.css?v=20260917-sidebar-scroll2">
+<link rel="stylesheet" href="css/style.css?v=20260917-templates">
 </head>
 <body>
 
@@ -126,11 +126,12 @@
                     </div>
 
                     <div class="customization-group">
-                        <h4>Layout</h4>
-                        <div class="option-group">
-                            <label class="option"><input type="radio" name="layout" value="modern" checked><span>Modern</span></label>
-                            <label class="option"><input type="radio" name="layout" value="minimal"><span>Minimal</span></label>
-                            <label class="option"><input type="radio" name="layout" value="professional"><span>Professional</span></label>
+                        <h4 id="templateHeading">Portfolio Template</h4>
+                        <p class="group-hint">Choose a design to apply instantly. Your text and selected colors stay unchanged.</p>
+                        <div class="template-options" role="radiogroup" aria-labelledby="templateHeading">
+                            <label class="template-option"><input type="radio" name="layout" value="modern" checked><span class="template-card"><span class="template-thumb template-thumb-modern" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Modern</strong><small>Centered hero &amp; rounded cards</small></span></span></label>
+                            <label class="template-option"><input type="radio" name="layout" value="minimal"><span class="template-card"><span class="template-thumb template-thumb-minimal" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Minimal</strong><small>Clean typography &amp; simple lines</small></span></span></label>
+                            <label class="template-option"><input type="radio" name="layout" value="professional"><span class="template-card"><span class="template-thumb template-thumb-professional" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Professional</strong><small>Accent banner &amp; structured sections</small></span></span></label>
                         </div>
                     </div>
 
@@ -202,7 +203,7 @@
 <!-- App scripts (order matters) -->
 <script src="js/app.js?v=20260916"></script>
 <script src="js/resumeAnalyzer.js?v=20260916-projects2"></script>
-<script src="js/portfolioGenerator.js?v=20260917-sidebar-scroll2"></script>
+<script src="js/portfolioGenerator.js?v=20260917-templates"></script>
 <script src="js/pdfParser.js?v=20260916"></script>
 <script src="js/docxParser.js?v=20260916"></script>
 <script src="js/upload.js?v=20260916"></script>
