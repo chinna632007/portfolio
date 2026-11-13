@@ -12,7 +12,7 @@
      so parsing works offline, over file:// and without any CDN). -->
 <script src="lib/pdf.min.js?v=20260909"></script>
 <script src="lib/mammoth.browser.min.js?v=20260909"></script>
-<link rel="stylesheet" href="css/style.css?v=20260917-templates">
+<link rel="stylesheet" href="css/style.css?v=20260919-templates15">
 </head>
 <body>
 
@@ -33,6 +33,7 @@
             <span class="brand-text">Resume&nbsp;<em>&rarr;</em>&nbsp;Portfolio</span>
         </a>
         <div class="header-actions">
+            <button class="btn btn-ghost btn-small header-nav-btn" id="templatesBtn">&#9638; Templates</button>
             <button class="btn btn-ghost btn-small" id="backBtn">&larr; Re-upload</button>
             <button class="btn btn-primary btn-small" id="exportBtn">&#8681; Export HTML</button>
         </div>
@@ -82,6 +83,20 @@
                 </div>
             </div>
 
+            <!-- Template gallery teaser -->
+            <div class="tpl-teaser reveal d-3">
+                <div class="tpl-teaser-mini" aria-hidden="true">
+                    <span class="tpl-teaser-bar tpl-teaser-bar-1"></span>
+                    <span class="tpl-teaser-bar tpl-teaser-bar-2"></span>
+                    <span class="tpl-teaser-bar tpl-teaser-bar-3"></span>
+                </div>
+                <div class="tpl-teaser-text">
+                    <h2><em>15</em> portfolio templates, one preserved resume</h2>
+                    <p class="muted">Modern, Minimal, Professional, Elegant, Bold, Creative, Magazine, Terminal, Glass, Retro, Neon, Pastel, Compact, Split and Aurora &mdash; every template restyles the same exact content, never rewrites it.</p>
+                </div>
+                <button class="btn btn-ghost" id="templatesTeaserBtn">&#9638; Browse templates</button>
+            </div>
+
             <!-- How it works -->
             <div class="how">
                 <div class="how-item reveal"><span class="how-num">1</span><div><h3>Upload</h3><p>Any PDF, DOCX or TXT resume.</p></div></div>
@@ -115,24 +130,21 @@
 
                     <div class="customization-group">
                         <h4>Accent Color</h4>
-                        <div class="color-options">
-                            <label class="color-option" data-v="indigo" title="Indigo"><input type="radio" name="color" value="indigo" aria-label="Indigo" checked><span style="background:#6366f1"></span></label>
-                            <label class="color-option" data-v="blue" title="Blue"><input type="radio" name="color" value="blue" aria-label="Blue"><span style="background:#3b82f6"></span></label>
-                            <label class="color-option" data-v="emerald" title="Emerald"><input type="radio" name="color" value="emerald" aria-label="Emerald"><span style="background:#10b981"></span></label>
-                            <label class="color-option" data-v="rose" title="Rose"><input type="radio" name="color" value="rose" aria-label="Rose"><span style="background:#f43f5e"></span></label>
-                            <label class="color-option" data-v="amber" title="Amber"><input type="radio" name="color" value="amber" aria-label="Amber"><span style="background:#f59e0b"></span></label>
-                            <label class="color-option" data-v="purple" title="Purple"><input type="radio" name="color" value="purple" aria-label="Purple"><span style="background:#8b5cf6"></span></label>
-                        </div>
+                        <p class="group-hint">Fifteen palettes &mdash; every one works in Light and Dark.</p>
+                        <!-- Swatches are generated from the color registry so a
+                             palette can never be offered without a matching rule. -->
+                        <div class="color-options" id="colorOptions"></div>
                     </div>
 
                     <div class="customization-group">
                         <h4 id="templateHeading">Portfolio Template</h4>
-                        <p class="group-hint">Choose a design to apply instantly. Your text and selected colors stay unchanged.</p>
-                        <div class="template-options" role="radiogroup" aria-labelledby="templateHeading">
-                            <label class="template-option"><input type="radio" name="layout" value="modern" checked><span class="template-card"><span class="template-thumb template-thumb-modern" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Modern</strong><small>Centered hero &amp; rounded cards</small></span></span></label>
-                            <label class="template-option"><input type="radio" name="layout" value="minimal"><span class="template-card"><span class="template-thumb template-thumb-minimal" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Minimal</strong><small>Clean typography &amp; simple lines</small></span></span></label>
-                            <label class="template-option"><input type="radio" name="layout" value="professional"><span class="template-card"><span class="template-thumb template-thumb-professional" aria-hidden="true"><i></i><i></i><i></i></span><span><strong>Professional</strong><small>Accent banner &amp; structured sections</small></span></span></label>
-                        </div>
+                        <p class="group-hint">The three most versatile designs are one click away &mdash; all fifteen live in the gallery.</p>
+                        <!-- The three featured designs are generated from the
+                             template registry, so the sidebar can never drift
+                             from the designs that actually ship. -->
+                        <div class="template-options" id="templateOptions" role="radiogroup" aria-labelledby="templateHeading"></div>
+                        <p class="template-note" id="templateActiveNote"></p>
+                        <button type="button" class="btn btn-ghost btn-small full" id="browseTemplatesBtn">&#9638; Browse all templates</button>
                     </div>
 
                     <div class="customization-group">
@@ -163,6 +175,23 @@
                     <div id="portfolioPreview"><!-- generated portfolio injected --></div>
                 </div>
             </main>
+        </div>
+    </section>
+
+    <!-- ===================== TEMPLATES GALLERY VIEW ===================== -->
+    <section class="view" id="view-templates">
+        <div class="container templates-wrap">
+            <header class="templates-head">
+                <span class="pill reveal">&#9638; Templates</span>
+                <h1 class="hero-title reveal">Pick a template, get your portfolio <em>instantly</em></h1>
+                <p class="hero-sub reveal d-1">Every card below is a live preview of the real design. Choose one and your portfolio is generated with it &mdash; same sections, same order, same exact wording, just a new look.</p>
+                <div class="templates-bar reveal d-2">
+                    <p class="templates-current" id="templateCurrent"></p>
+                    <button class="btn btn-ghost btn-small" id="templatesBackBtn">&larr; Back</button>
+                </div>
+            </header>
+            <div class="template-gallery" id="templateGallery"><!-- template cards injected --></div>
+            <p class="templates-note reveal d-3"><strong>Nothing is rewritten.</strong> A template is pure styling: your section titles, their order and every line of your resume stay exactly as extracted.</p>
         </div>
     </section>
 </main>
@@ -203,15 +232,18 @@
 <!-- App scripts (order matters) -->
 <script src="js/app.js?v=20260916"></script>
 <script src="js/resumeAnalyzer.js?v=20260916-projects2"></script>
-<script src="js/portfolioGenerator.js?v=20260917-templates"></script>
+<script src="js/portfolioGenerator.js?v=20260919-templates15"></script>
+<script src="js/templates.js?v=20260919-templates15"></script>
 <script src="js/pdfParser.js?v=20260916"></script>
 <script src="js/docxParser.js?v=20260916"></script>
 <script src="js/upload.js?v=20260916"></script>
 <script src="js/animations.js?v=20260916"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        PortfolioGenerator.buildPicker();
         Upload.init();
         Animations.init();
+        Templates.init();
         // reopen the preview view if resume data already exists
         if (window.App && App.getData()) { PortfolioGenerator.initPreviewPage(); }
     });

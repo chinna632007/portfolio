@@ -52,6 +52,7 @@ const sandbox = {
     console, setTimeout, clearTimeout,
     requestAnimationFrame(fn) { return setTimeout(() => fn(Date.now()), 0); },
     confirm() { return false; }, alert() {},
+    scrollTo() {},
     CustomEvent: function (t) { this.type = t; },
     Blob: function (p, o) { this.parts = p; this.options = o; },
     URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() {} },
@@ -72,7 +73,7 @@ sandbox.window = sandbox;
 vm.createContext(sandbox);
 
 /* ---------------- load scripts exactly like index.html ---------------- */
-const FILES = ['js/app.js', 'js/resumeAnalyzer.js', 'js/portfolioGenerator.js',
+const FILES = ['js/app.js', 'js/resumeAnalyzer.js', 'js/portfolioGenerator.js', 'js/templates.js',
     'js/pdfParser.js', 'js/docxParser.js', 'js/upload.js', 'js/animations.js'];
 
 head('Module load smoke test (index.html script order)');
@@ -87,6 +88,8 @@ const PG = sandbox.PortfolioGenerator;
 ok(!!RA && typeof RA.analyze === 'function' && typeof RA.classify === 'function', 'ResumeAnalyzer exposes analyze/classify/validate');
 ok(!!PG && typeof PG.render === 'function', 'PortfolioGenerator exposes render');
 ok(!!sandbox.Upload && !!sandbox.Animations && !!sandbox.PdfParser && !!sandbox.DocxParser, 'Upload/Animations/PdfParser/DocxParser exposed');
+ok(!!sandbox.Templates && typeof sandbox.Templates.open === 'function' && typeof sandbox.Templates.choose === 'function',
+    'Templates gallery page exposes open/choose');
 /* ---------------- sample resumes (3 different layouts) ---------------- */
 const SAMPLES = [
     {
@@ -247,8 +250,8 @@ SAMPLES.forEach((S) => {
 
     /* hero shows only what exists */
     ok(html.indexOf(esc(S.name)) !== -1, 'hero shows exact name');
-    if (S.file === 'resumeB.txt') ok(html.indexOf('pf-hero-role') !== -1, 'hero shows role (exists in resume)');
-    else ok(html.indexOf('pf-hero-role') === -1, 'hero invents no role (none in resume)');
+    if (S.file === 'resumeB.txt') ok(html.indexOf('class="pf-hero-role') !== -1, 'hero shows role (exists in resume)');
+    else ok(html.indexOf('class="pf-hero-role') === -1, 'hero invents no role (none in resume)');
 
     /* the hero header must never mistake a skills row for the location */
     const heroPills = (html.match(/<div class="pf-hero-pills">[\s\S]*?<\/div>/) || [''])[0];
@@ -379,6 +382,106 @@ const sharedStyle = projectOutput.match(/<style>([\s\S]*?)<\/style>/)[1];
 ok(projectExport.includes(sharedStyle), 'preview and export share identical layout refinements');
 ok(sharedStyle.includes('@media(max-width:640px)') && sharedStyle.includes('grid-template-columns: minmax(0, 1fr)'), 'layout includes single-column mobile cards');
 ok(sharedStyle.includes('@media(prefers-reduced-motion:reduce)') && sharedStyle.includes('@media print'), 'layout supports reduced motion and visible printed content');
+
+head('TEMPLATE GALLERY + TEMPLATE / COLOR REGISTRIES');
+const TPL = sandbox.Templates;
+const tplIds = PG.templateIds;
+const tplParsed = RA.analyze(fs.readFileSync(path.join(__dirname, 'samples/resumeA.txt'), 'utf8'), 'resumeA.txt');
+
+ok(PG.templates.length >= 10 && PG.templates.length <= 15,
+    'template registry lists 10-15 unique designs (' + PG.templates.length + ')');
+ok(PG.colors.length >= 10 && PG.colors.length <= 20,
+    'accent registry offers a full palette set (' + PG.colors.length + ' colors)');
+ok(new Set(PG.colorIds).size === PG.colorIds.length, 'accent color ids are unique');
+ok(PG.colors.every((c) => c.name && /^#[0-9a-f]{6}$/i.test(c.accent) && /^#[0-9a-f]{6}$/i.test(c.accent2)),
+    'every accent color defines a name plus both accent stops');
+ok(PG.featuredIds.length === 3, 'the sidebar is limited to the 3 best templates');
+ok(PG.featuredIds.every((id) => tplIds.indexOf(id) !== -1), 'the featured three are real registered templates');
+
+/* every registered color must ship a rule for BOTH themes, or the swatch
+   would look dead (this is the bug that made colors appear to do nothing) */
+const themeCss = PG.layoutCss();
+ok(PG.colors.every((c) => themeCss.indexOf('.pf-root.pf-' + c.id + '{--pf-accent:' + c.accent + ';') !== -1),
+    'every accent color ships its own variable rule');
+ok(PG.colors.every((c) => themeCss.indexOf('.pf-root.pf-dark.pf-' + c.id + '{--pf-accent-soft:') !== -1),
+    'every accent color keeps a stronger tint in dark mode');
+ok(PG.colorIds.every((c) => PG.buildStandalone(tplParsed, { theme: 'dark', color: c, layout: 'modern' })
+        .indexOf('.pf-root.pf-' + c + '{--pf-accent:') !== -1),
+    'every accent color travels into the exported HTML');
+
+/* the sidebar controls are generated from the registries */
+PG.buildPicker();
+const sidebarTpl = els.templateOptions.innerHTML;
+const sidebarColor = els.colorOptions.innerHTML;
+ok((sidebarTpl.match(/name="layout"/g) || []).length === 3, 'sidebar renders exactly the 3 featured template tiles');
+ok(PG.featuredIds.every((id) => sidebarTpl.indexOf('value="' + id + '"') !== -1),
+    'sidebar tiles are the featured designs');
+ok(tplIds.filter((id) => PG.featuredIds.indexOf(id) === -1)
+        .every((id) => sidebarTpl.indexOf('value="' + id + '"') === -1),
+    'non-featured designs are never offered in the sidebar');
+ok((sidebarColor.match(/name="color"/g) || []).length === PG.colors.length,
+    'sidebar renders one swatch per registered accent color');
+ok(PG.colorIds.every((id) => sidebarColor.indexOf('value="' + id + '"') !== -1),
+    'every registered accent color is offered in the sidebar');
+ok(PG.colors.every((c) => sidebarColor.indexOf(c.accent) !== -1),
+    'each swatch paints its own accent color');
+ok(new Set(tplIds).size === tplIds.length, 'template ids are unique');
+ok(PG.templates.every((t) => t.id && t.name && t.tagline && t.blurb && (t.tags || []).length),
+    'every template describes itself (name, tagline, blurb, tags)');
+
+/* one shared stylesheet: preview and export, every design included.
+   "modern" is the base design, so it needs no extra rule of its own. */
+const designCss = PG.render(tplParsed, {}).match(/<style>([\s\S]*?)<\/style>/)[1];
+tplIds.forEach((id) => {
+    const styled = id === 'modern' || designCss.indexOf('.pf-root.pf-' + id + ' ') !== -1;
+    ok(styled, 'design CSS shipped for "' + id + '"' + (id === 'modern' ? ' (base design)' : ''));
+});
+ok(designCss.indexOf('@keyframes pfSpin') !== -1, 'creative template ships its spinning ring keyframes');
+ok(PG.templates.every((t) => t.tags.length >= 2), 'every template lists at least two feature tags for the gallery');
+
+/* a template must only change the ROOT CLASS - never the resume markup */
+const htmlFor = (id) => PG.render(tplParsed, { layout: id });
+const stripRoot = (html) => html.replace(/^<div class="pf-root[^"]*">/, '');
+ok(new Set(tplIds.map((id) => htmlFor(id).match(/^<div class="(pf-root[^"]*)"/)[1])).size === tplIds.length,
+    'each template renders a distinct appearance class');
+ok(tplIds.every((id) => stripRoot(htmlFor(id)) === stripRoot(htmlFor('modern'))),
+    'no template alters a single line of resume markup - only the root class changes');
+ok(tplIds.every((id) => PG.buildStandalone(tplParsed, { theme: 'dark', color: 'amber', layout: id })
+        .indexOf('.pf-root.pf-' + id + ' ') !== -1),
+    'every template travels into the exported HTML');
+ok(PG.appearanceClasses({ theme: 'dark', color: 'rose', layout: 'creative' }) === 'pf-root pf-dark pf-rose pf-creative',
+    'appearance class builder accepts every registered template');
+ok(PG.appearanceClasses({ layout: 'nonsense' }) === 'pf-root pf-light pf-indigo pf-modern',
+    'an unknown template falls back to the default instead of breaking the render');
+
+/* the gallery page itself */
+TPL.render();
+const gallery = els.templateGallery.innerHTML;
+ok((gallery.match(/class="tpl-pick"/g) || []).length === tplIds.length,
+    'gallery renders exactly one choose button per template');
+ok((gallery.match(/<style>/g) || []).length === 1,
+    'gallery injects the shared stylesheet once instead of once per card');
+ok((gallery.match(/<div class="pf-root /g) || []).length === tplIds.length,
+    'every gallery card embeds a real generated portfolio preview');
+const galleryCards = gallery.split('<article class="tpl-card').slice(1);
+ok(galleryCards.length === tplIds.length, 'gallery contains one card per template');
+ok(galleryCards.every((card, i) => card.indexOf('pf-' + tplIds[i] + '"') !== -1),
+    'each gallery card previews its own template design, not the currently selected one');
+ok(tplIds.every((id) => gallery.indexOf('data-template="' + id + '"') !== -1),
+    'gallery cards are wired to their template id');
+ok(PG.templates.every((t) => gallery.indexOf(esc(t.name)) !== -1 && gallery.indexOf(esc(t.blurb)) !== -1),
+    'gallery shows every template name and description');
+ok(gallery.indexOf('aria-pressed="true"') !== -1 && gallery.indexOf('aria-pressed="false"') !== -1,
+    'gallery marks the active template for assistive tech');
+ok(els.templateCurrent.textContent.indexOf('Currently using:') === 0,
+    'gallery reports the currently applied template');
+
+/* choosing from the gallery persists the choice (no resume = stay on home) */
+sandbox.App.clearData();
+TPL.choose('creative');
+ok(sandbox.App.getCustom().layout === 'creative', 'choosing a template saves it as the active template');
+TPL.choose('not-a-template');
+ok(sandbox.App.getCustom().layout === 'creative', 'an unknown template id never corrupts the saved choice');
 
 head('RESULT');
 console.log('  ' + pass + ' passed, ' + fail + ' failed');

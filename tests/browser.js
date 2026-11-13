@@ -149,7 +149,7 @@ function checkEditor(sample) {
             document.querySelector('input[name="theme"][value="dark"]').click();
             document.querySelector('input[name="color"][value="rose"]').click();
             document.querySelector('input[name="layout"][value="professional"]').click();
-            const appearanceRoot = document.querySelector('#portfolioPreview .pf-root');
+            let appearanceRoot = document.querySelector('#portfolioPreview .pf-root');
             const appearanceStyle = getComputedStyle(appearanceRoot);
             results.appearance = {
                 classes: appearanceRoot.className,
@@ -172,28 +172,141 @@ function checkEditor(sample) {
             const sourceBefore = JSON.stringify(App.getData());
             const contentBefore = Array.from(appearanceRoot.querySelectorAll('.pf-section')).map(el => el.textContent).join('|');
             results.templateStyles = [];
+            results.templateNames = [];
+            results.appliedStyles = [];
+            results.appliedNames = [];
             results.paletteMatrix = true;
-            const palette = { indigo: '#6366f1', blue: '#3b82f6', emerald: '#10b981', rose: '#f43f5e', amber: '#f59e0b', purple: '#8b5cf6' };
-            for (const layout of ['modern', 'minimal', 'professional']) {
-                document.querySelector('input[name="layout"][value="' + layout + '"]').closest('label').querySelector('strong').click();
-                const heroStyle = getComputedStyle(appearanceRoot.querySelector('.pf-hero'));
-                results.templateStyles.push([heroStyle.textAlign, heroStyle.borderTopWidth,
-                    getComputedStyle(appearanceRoot.querySelector('.pf-hero-avatar')).borderRadius].join('|'));
-                for (const theme of ['light', 'dark']) {
-                    document.querySelector('input[name="theme"][value="' + theme + '"]').click();
-                    for (const color of Object.keys(palette)) {
-                        document.querySelector('input[name="color"][value="' + color + '"]').closest('label').querySelector('span').click();
-                        const style = getComputedStyle(appearanceRoot);
-                        results.paletteMatrix = results.paletteMatrix && style.getPropertyValue('--pf-accent').trim() === palette[color] &&
-                            style.backgroundColor === (theme === 'dark' ? 'rgb(11, 18, 32)' : 'rgb(248, 250, 252)');
-                    }
+            results.accentKept = true;
+            results.registry = {
+                templates: PortfolioGenerator.templateIds,
+                featured: PortfolioGenerator.featuredIds,
+                colors: PortfolioGenerator.colorIds
+            };
+            results.sidebarLayouts = Array.from(document.querySelectorAll('input[name="layout"]')).map(r => r.value);
+            results.sidebarColors = Array.from(document.querySelectorAll('input[name="color"]')).map(r => r.value);
+            results.sidebarActiveNote = document.getElementById('templateActiveNote').textContent;
+            const palette = {};
+            PortfolioGenerator.colors.forEach(c => { palette[c.id] = c.accent; });
+            results.paletteCount = Object.keys(palette).length;
+            /* One measurement vocabulary shared by thumbnails and the real
+               preview, so a template can be compared wherever it renders. */
+            const designOf = (root) => {
+                const hero = getComputedStyle(root.querySelector('.pf-hero'));
+                const avatar = getComputedStyle(root.querySelector('.pf-hero-avatar'));
+                const title = getComputedStyle(root.querySelector('.pf-section-title'));
+                return [hero.textAlign, hero.borderTopWidth, hero.borderBottomWidth,
+                    hero.backgroundImage === 'none' ? 'flat' : 'gradient', hero.borderBottomStyle, hero.paddingTop,
+                    avatar.borderRadius, avatar.width, avatar.backgroundImage === 'none' ? 'flat' : 'gradient',
+                    title.textTransform, title.fontFamily.split(',')[0], title.fontSize, title.fontWeight].join('|');
+            };
+            const accentOf = (root) => getComputedStyle(root).getPropertyValue('--pf-accent').trim();
+            const currentAccent = () => palette[App.getCustom().color];
+            /* 1. Every design is measured from its own gallery thumbnail, so a card
+               can never silently fall back to another template's look. */
+            document.getElementById('templatesBtn').click();
+            Array.from(document.getElementById('templateGallery').querySelectorAll('.tpl-card')).forEach(card => {
+                const id = card.getAttribute('data-template');
+                const thumbRoot = card.querySelector('.tpl-preview-stage .pf-root');
+                results.templateNames.push(id);
+                results.templateStyles.push(designOf(thumbRoot));
+                results.accentKept = results.accentKept && accentOf(thumbRoot) === currentAccent();
+            });
+            document.getElementById('templatesBackBtn').click();
+
+            /* 2. Apply non-featured designs for real - they are only reachable
+               through the gallery, so this proves the round trip works. */
+            for (const layout of ['terminal', 'split', 'magazine', 'creative']) {
+                document.getElementById('templatesBtn').click();
+                document.querySelector('.tpl-pick[data-template="' + layout + '"]').click();
+                appearanceRoot = document.querySelector('#portfolioPreview .pf-root');
+                results.appliedNames.push(layout);
+                results.appliedStyles.push(designOf(appearanceRoot) + '|' + appearanceRoot.className);
+                results.accentKept = results.accentKept && accentOf(appearanceRoot) === currentAccent();
+            }
+
+            /* 3. Every accent in both themes, measured on the base design. */
+            document.querySelector('input[name="layout"][value="modern"]').click();
+            for (const theme of ['light', 'dark']) {
+                document.querySelector('input[name="theme"][value="' + theme + '"]').click();
+                for (const color of Object.keys(palette)) {
+                    document.querySelector('input[name="color"][value="' + color + '"]').closest('label').querySelector('span').click();
+                    const style = getComputedStyle(appearanceRoot);
+                    results.paletteMatrix = results.paletteMatrix && style.getPropertyValue('--pf-accent').trim() === palette[color] &&
+                        style.backgroundColor === (theme === 'dark' ? 'rgb(11, 18, 32)' : 'rgb(248, 250, 252)');
                 }
             }
-            results.appearanceKeepsContent = appearanceRoot === document.querySelector('#portfolioPreview .pf-root') &&
-                contentBefore === Array.from(appearanceRoot.querySelectorAll('.pf-section')).map(el => el.textContent).join('|') &&
+            /* End on dark/purple/professional so the assertions below stay valid. */
+            document.querySelector('input[name="theme"][value="dark"]').click();
+            document.querySelector('input[name="color"][value="purple"]').click();
+            document.querySelector('input[name="layout"][value="professional"]').click();
+            results.appearanceKeepsContent =
+                contentBefore === Array.from(document.querySelector('#portfolioPreview .pf-root').querySelectorAll('.pf-section')).map(el => el.textContent).join('|') &&
                 sourceBefore === JSON.stringify(App.getData());
             PortfolioGenerator.initPreviewPage();
             results.appearanceRestored = document.querySelector('#portfolioPreview .pf-root').className === 'pf-root pf-dark pf-purple pf-professional';
+
+            // ---- Templates gallery page ----
+            const contentOf = (rootEl) => Array.from(rootEl.querySelectorAll('.pf-section')).map(el => el.textContent).join('|');
+            const galleryBtn = document.getElementById('templatesBtn');
+            results.galleryBtnVisible = galleryBtn.getBoundingClientRect().width > 0;
+            galleryBtn.click();
+            results.galleryOpened = document.getElementById('view-templates').classList.contains('active') &&
+                !document.getElementById('view-preview').classList.contains('active');
+            const gallery = document.getElementById('templateGallery');
+            const cards = Array.from(gallery.querySelectorAll('.tpl-card'));
+            results.galleryCards = cards.length;
+            results.galleryIds = cards.map(c => c.getAttribute('data-template'));
+            results.galleryPickCount = gallery.querySelectorAll('.tpl-pick').length;
+            results.galleryPreviews = cards.every(c => !!c.querySelector('.tpl-preview-stage .pf-root'));
+            results.galleryPerCard = cards.map(c => c.querySelector('.tpl-preview-stage .pf-root').className);
+            results.galleryStageScaled = cards.every(c => {
+                const box = c.querySelector('.tpl-preview');
+                const stage = c.querySelector('.tpl-preview-stage');
+                const m = /scale\(([\d.]+)\)/.exec(stage.style.transform || '');
+                if (!m) { return false; }
+                if (Math.abs(parseFloat(m[1]) - box.clientWidth / 1040) > 0.01) { return false; }
+                // the scaled page must actually cover the visible slice
+                return stage.getBoundingClientRect().width >= box.clientWidth - 1 && box.clientHeight >= 150;
+            });
+            results.galleryNoOverflow = document.documentElement.scrollWidth <= window.innerWidth + 1;
+            results.gallerySingleActive = gallery.querySelectorAll('.tpl-card.is-active').length === 1;
+            const activeCard = gallery.querySelector('.tpl-card.is-active');
+            results.galleryActiveCard = !!activeCard && activeCard.getAttribute('data-template') === 'professional';
+            const customNow = App.getCustom();
+            results.galleryThemeMatches = cards.every(c =>
+                c.querySelector('.pf-root').className.indexOf('pf-' + customNow.theme) !== -1);
+            results.galleryAccentMatches = cards.every(c =>
+                getComputedStyle(c.querySelector('.pf-root')).getPropertyValue('--pf-accent').trim() === palette[customNow.color]);
+
+            const galleryDataBefore = JSON.stringify(App.getData());
+            const galleryContentBefore = contentOf(document.querySelector('#portfolioPreview .pf-root'));
+            gallery.querySelector('.tpl-pick[data-template="creative"]').click();
+            const chosenRoot = document.querySelector('#portfolioPreview .pf-root');
+            results.galleryChosen = {
+                view: document.getElementById('view-preview').classList.contains('active'),
+                cls: chosenRoot.className,
+                saved: App.getCustom().layout,
+                checked: document.querySelectorAll('input[name="layout"]:checked').length,
+                note: document.getElementById('templateActiveNote').textContent,
+                content: contentOf(chosenRoot) === galleryContentBefore,
+                data: JSON.stringify(App.getData()) === galleryDataBefore
+            };
+            galleryBtn.click();
+            const reopened = document.getElementById('templateGallery').querySelector('.tpl-card.is-active');
+            results.galleryReflectsChoice = !!reopened && reopened.getAttribute('data-template') === 'creative' &&
+                reopened.querySelector('.tpl-pick').getAttribute('aria-pressed') === 'true';
+
+            // the gallery is explorable before any resume is uploaded
+            const dataBackup = App.getData();
+            const customBackup = Object.assign({}, App.getCustom());
+            App.clearData();
+            Templates.open();
+            results.galleryNoResumeCards = document.getElementById('templateGallery').querySelectorAll('.tpl-card').length;
+            document.querySelector('.tpl-pick[data-template="elegant"]').click();
+            results.galleryNoResumeGoesHome = document.getElementById('view-home').classList.contains('active') &&
+                App.getCustom().layout === 'elegant';
+            App.saveData(dataBackup);
+            App.saveCustom(customBackup);
         } catch (e) { results.error = e.message; }
         const report = document.createElement('pre');
         report.id = 'browser-report';
@@ -245,8 +358,51 @@ try {
         assert.strictEqual(result.exportAppearance.text, result.appearance.text, 'Export text must match preview');
         assert.strictEqual(result.exportAppearance.accent, result.appearance.accent, 'Export accent must match preview');
         assert(result.paletteMatrix && result.appearanceKeepsContent && result.appearanceRestored, 'All palettes/templates must apply without replacing resume content');
-        assert.strictEqual(new Set(result.templateStyles).size, 3, 'Templates must have visibly distinct layouts');
-        console.log('PASS browser sidebar, appearance, export, repeated generation, and layout at ' + width + 'px');
+        assert(result.registry.templates.length >= 10 && result.registry.templates.length <= 15,
+            'Registry must offer 10-15 portfolio templates, got ' + result.registry.templates.length);
+        assert.strictEqual(result.registry.featured.length, 3, 'Exactly the 3 best templates belong in the sidebar');
+        assert.deepStrictEqual(result.sidebarLayouts, result.registry.featured,
+            'Sidebar must list only the 3 featured templates: ' + JSON.stringify(result.sidebarLayouts));
+        assert.strictEqual(result.sidebarColors.length, result.registry.colors.length,
+            'Sidebar must offer every registered accent color');
+        assert.strictEqual(result.paletteCount, result.registry.colors.length,
+            'Every accent color must reach the browser with its hex value');
+        assert.strictEqual(result.sidebarActiveNote, 'In use: Professional',
+            'Sidebar must report the design in use: ' + result.sidebarActiveNote);
+        assert(result.accentKept, 'No template may override the chosen accent color');
+        assert.strictEqual(new Set(result.templateStyles).size, result.registry.templates.length,
+            'All ' + result.registry.templates.length + ' templates must be visibly distinct: ' +
+            JSON.stringify(result.templateNames.map((n, i) => n + '=' + result.templateStyles[i])));
+        assert.strictEqual(new Set(result.appliedStyles).size, result.appliedStyles.length,
+            'Gallery-chosen designs must really apply to the preview: ' + JSON.stringify(result.appliedStyles));
+        assert(result.appliedStyles.every((s, i) => s.indexOf('pf-' + result.appliedNames[i]) !== -1),
+            'Applied preview must carry the chosen template class: ' + JSON.stringify(result.appliedStyles));
+        assert(result.galleryBtnVisible && result.galleryOpened, 'Templates button must open the gallery at every width: ' + JSON.stringify(result));
+        assert.strictEqual(result.galleryCards, result.registry.templates.length,
+            'Gallery must present all ' + result.registry.templates.length + ' templates');
+        assert.deepStrictEqual(result.galleryIds, result.registry.templates,
+            'Gallery order must match the template registry');
+        assert.strictEqual(result.galleryPickCount, result.registry.templates.length, 'Every card needs exactly one choose button');
+        assert(result.galleryPreviews && result.galleryStageScaled,
+            'Every card must embed a correctly scaled live portfolio preview: ' + JSON.stringify(result));
+        assert.deepStrictEqual(result.galleryPerCard,
+            result.registry.templates.map(id => 'pf-root pf-dark pf-purple pf-' + id),
+            'Each card must preview its OWN template design: ' + JSON.stringify(result.galleryPerCard));
+        assert(result.galleryNoOverflow, 'Gallery must not overflow horizontally');
+        assert(result.gallerySingleActive && result.galleryActiveCard, 'Gallery must mark exactly the active template');
+        assert(result.galleryThemeMatches && result.galleryAccentMatches,
+            'Thumbnails must follow the chosen theme and accent color');
+        assert(result.galleryChosen.view && result.galleryChosen.cls.indexOf('pf-creative') !== -1 &&
+            result.galleryChosen.saved === 'creative' && result.galleryChosen.checked === 0 &&
+            result.galleryChosen.note.indexOf('Creative') !== -1 &&
+            result.galleryChosen.content && result.galleryChosen.data,
+            'Choosing a template must regenerate the portfolio with it and leave the resume untouched: ' +
+            JSON.stringify(result.galleryChosen));
+        assert(result.galleryReflectsChoice, 'Reopening the gallery must show the chosen template as active');
+        assert.strictEqual(result.galleryNoResumeCards, result.registry.templates.length,
+            'Gallery must be explorable before a resume is uploaded');
+        assert(result.galleryNoResumeGoesHome, 'Choosing a template without a resume must not break the app');
+        console.log('PASS browser sidebar, appearance, export, templates gallery, and layout at ' + width + 'px');
     }
 } finally {
     fs.rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

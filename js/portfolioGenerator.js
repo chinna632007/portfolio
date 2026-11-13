@@ -647,12 +647,149 @@ const PortfolioGenerator = (function () {
             '<div class="pf-progress" aria-hidden="true"><span></span></div></div></nav>';
     }
 
+    /* ---------- the single accent-color registry ----------
+       One definition drives the sidebar swatches, the live preview CSS and
+       the exported CSS. A color therefore can never be offered in the UI
+       without a matching rule behind it (that drift is exactly what made
+       swatches look "dead" before). */
+    function hexToRgba(hex, alpha) {
+        const raw = String(hex || '').replace('#', '');
+        const full = raw.length === 3 ? raw.replace(/./g, (c) => c + c) : raw;
+        const n = parseInt(full, 16);
+        if (!full || isNaN(n)) return 'rgba(99,102,241,' + alpha + ')';
+        return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+    }
+
+    const COLORS = [
+        { id: 'indigo',  name: 'Indigo',  accent: '#6366f1', accent2: '#8b5cf6' },
+        { id: 'blue',    name: 'Blue',    accent: '#3b82f6', accent2: '#2563eb' },
+        { id: 'sky',     name: 'Sky',     accent: '#0ea5e9', accent2: '#0284c7' },
+        { id: 'cyan',    name: 'Cyan',    accent: '#06b6d4', accent2: '#0891b2' },
+        { id: 'teal',    name: 'Teal',    accent: '#14b8a6', accent2: '#0d9488' },
+        { id: 'emerald', name: 'Emerald', accent: '#10b981', accent2: '#059669' },
+        { id: 'lime',    name: 'Lime',    accent: '#65a30d', accent2: '#4d7c0f' },
+        { id: 'amber',   name: 'Amber',   accent: '#f59e0b', accent2: '#d97706', soft: 0.16 },
+        { id: 'orange',  name: 'Orange',  accent: '#f97316', accent2: '#ea580c', soft: 0.15 },
+        { id: 'rose',    name: 'Rose',    accent: '#f43f5e', accent2: '#e11d48' },
+        { id: 'red',     name: 'Red',     accent: '#ef4444', accent2: '#dc2626' },
+        { id: 'pink',    name: 'Pink',    accent: '#ec4899', accent2: '#db2777' },
+        { id: 'purple',  name: 'Purple',  accent: '#8b5cf6', accent2: '#7c3aed' },
+        { id: 'violet',  name: 'Violet',  accent: '#7c3aed', accent2: '#6d28d9' },
+        { id: 'slate',   name: 'Slate',   accent: '#475569', accent2: '#334155' }
+    ];
+    const COLOR_IDS = COLORS.map((c) => c.id);
+
+    /* Generated theme tokens: the light/dark surfaces plus every accent,
+       with a stronger tint in dark mode so the color stays visible.
+       This is injected into the shared layout CSS, which is used by BOTH
+       the live preview and the downloaded file. */
+    const THEME_CSS = [
+        '.pf-root{--pf-bg:#f8fafc;--pf-surface:#ffffff;--pf-text:#0f172a;--pf-muted:#64748b;--pf-border:#e2e8f0;--pf-radius:16px;--pf-shadow:0 10px 30px rgba(15,23,42,.08);}',
+        '.pf-root.pf-dark{--pf-bg:#0b1220;--pf-surface:#141c30;--pf-text:#e6edf7;--pf-muted:#94a3b8;--pf-border:#26334d;}'
+    ].concat(COLORS.map((c) => {
+        const soft = typeof c.soft === 'number' ? c.soft : 0.13;
+        return '.pf-root.pf-' + c.id + '{--pf-accent:' + c.accent + ';--pf-accent-2:' + c.accent2 + ';' +
+            '--pf-accent-soft:' + hexToRgba(c.accent, soft) + ';}' +
+            '.pf-root.pf-dark.pf-' + c.id + '{--pf-accent-soft:' + hexToRgba(c.accent, Math.min(0.34, soft + 0.11)) + ';}';
+    })).join('\n');
+
+    /* ---------- the single template registry ----------
+       Drives the sidebar radios, the Templates gallery page and the
+       exported file, so a template can never be listed in one place
+       and missing from another. Designs themselves are pure CSS
+       (see PORTFOLIO_LAYOUT_CSS) and never replace resume content. */
+    const TEMPLATES = [
+        {
+            id: 'modern', name: 'Modern', tagline: 'Centered hero & rounded cards',
+            blurb: 'A centered hero with a gradient name treatment and soft rounded cards. The safe, friendly default for any resume.',
+            tags: ['Centered hero', 'Gradient name', 'Rounded cards'],
+            featured: true
+        },
+        {
+            id: 'minimal', name: 'Minimal', tagline: 'Clean typography & simple lines',
+            blurb: 'Left aligned, flat and quiet: square corners, hairline dividers and no shadows, so the writing does the talking.',
+            tags: ['Flat & square', 'No shadows', 'Typography first'],
+            featured: true
+        },
+        {
+            id: 'professional', name: 'Professional', tagline: 'Accent banner & rule headers',
+            blurb: 'A left hero with an accent banner and section headers marked by an accent rule. Built for formal applications.',
+            tags: ['Accent banner', 'Rule headers', 'Formal'],
+            featured: true
+        },
+        {
+            id: 'elegant', name: 'Elegant', tagline: 'Serif display & centered rules',
+            blurb: 'Serif headings, generous whitespace and a thin centered rule under every section title. Calm and editorial.',
+            tags: ['Serif headings', 'Centered rules', 'Editorial']
+        },
+        {
+            id: 'bold', name: 'Bold', tagline: 'Oversized type & thick accent bars',
+            blurb: 'Heavy uppercase headings and thick accent blocks on the hero and every card. Maximum visual impact.',
+            tags: ['Uppercase type', 'Thick bars', 'High impact']
+        },
+        {
+            id: 'creative', name: 'Creative', tagline: 'Soft gradients & playful shapes',
+            blurb: 'Large rounded corners, a soft gradient wash behind the hero and a slowly rotating accent ring around the avatar.',
+            tags: ['Big radii', 'Gradient wash', 'Playful']
+        },
+        {
+            id: 'magazine', name: 'Magazine', tagline: 'Editorial columns & big numbers',
+            blurb: 'An editorial cover treatment: oversized section numbering, serif overlines and running text set in real magazine columns.',
+            tags: ['Two columns', 'Editorial', 'Serif overlines']
+        },
+        {
+            id: 'terminal', name: 'Terminal', tagline: 'Monospace prompts & thin rules',
+            blurb: 'Monospace type, zero rounding and prompt-marked headings - a developer portfolio that reads like a well-kept shell session.',
+            tags: ['Monospace', 'Prompt marks', 'Zero radius']
+        },
+        {
+            id: 'glass', name: 'Glass', tagline: 'Frosted cards & soft light',
+            blurb: 'Translucent frosted cards floating over a soft gradient mesh, with hairline borders and gentle depth. Modern and airy.',
+            tags: ['Frosted cards', 'Blurred surfaces', 'Gradient mesh']
+        },
+        {
+            id: 'retro', name: 'Retro', tagline: 'Hard shadows & thick outlines',
+            blurb: 'Neo-brutalist blocks: thick outlines, hard offset shadows and no rounding at all. Confident, printed-poster energy.',
+            tags: ['Hard shadows', 'Thick outlines', 'No rounding']
+        },
+        {
+            id: 'neon', name: 'Neon', tagline: 'Glowing edges & deep canvas',
+            blurb: 'Dark panels with accent-lit borders, soft glows and a luminous name treatment - built to shine on a dark screen.',
+            tags: ['Glow effects', 'Lit borders', 'Dark canvas']
+        },
+        {
+            id: 'pastel', name: 'Pastel', tagline: 'Soft tints & extra-round cards',
+            blurb: 'Washed tints, very round corners and generous breathing room. Calm, friendly and easy on the eye.',
+            tags: ['Soft tints', 'Extra round', 'Very airy']
+        },
+        {
+            id: 'compact', name: 'Compact', tagline: 'Dense one-column resume sheet',
+            blurb: 'Tight, single column and print-friendly: small type, narrow measure and no decoration competing with the content.',
+            tags: ['Dense layout', 'Print friendly', 'Single column']
+        },
+        {
+            id: 'split', name: 'Split', tagline: 'Sticky rail & content column',
+            blurb: 'Each section keeps its heading pinned in a left rail while the content scrolls beside it. Structured and very scannable.',
+            tags: ['Sticky headings', 'Two columns', 'Scannable']
+        },
+        {
+            id: 'aurora', name: 'Aurora', tagline: 'Living gradient & glassy chips',
+            blurb: 'A slow shifting aurora gradient washes the hero, dividers and chips. Colour that moves without ever distracting.',
+            tags: ['Animated gradient', 'Glassy chips', 'Colour wash']
+        }
+    ];
+    const TEMPLATE_IDS = TEMPLATES.map((t) => t.id);
+    /* The sidebar deliberately offers only the three safest all-round
+       designs; every other template stays one click away in the gallery. */
+    const FEATURED_TEMPLATES = TEMPLATES.filter((t) => t.featured);
+    const FEATURED_IDS = FEATURED_TEMPLATES.map((t) => t.id);
+
     /* One class builder for live appearance updates and exported portfolios. */
     function appearanceClasses(custom) {
         const pick = (value, allowed) => allowed.includes(value) ? value : allowed[0];
         return 'pf-root pf-' + pick(custom.theme, ['light', 'dark']) +
-            ' pf-' + pick(custom.color, ['indigo', 'blue', 'emerald', 'rose', 'amber', 'purple']) +
-            ' pf-' + pick(custom.layout, ['modern', 'minimal', 'professional']);
+            ' pf-' + pick(custom.color, COLOR_IDS) +
+            ' pf-' + pick(custom.layout, TEMPLATE_IDS);
     }
 
     /* ---------- full preview HTML ---------- */
@@ -714,7 +851,7 @@ const PortfolioGenerator = (function () {
 
     /* Shared refinements travel with the markup: preview and offline export
        use exactly the same responsive project/section design. */
-    const PORTFOLIO_LAYOUT_CSS = `
+    const PORTFOLIO_LAYOUT_CSS = THEME_CSS + `
 .pf-root *, .pf-root *::before, .pf-root *::after { box-sizing: border-box; }
 .pf-root { overflow-wrap: anywhere; background: var(--pf-bg); color: var(--pf-text); line-height: 1.6; min-height: 100vh; }
 .pf-root.pf-light { color-scheme: light; }
@@ -796,6 +933,188 @@ const PortfolioGenerator = (function () {
 .pf-root.pf-professional .pf-section-head { padding: 14px; border-left: 4px solid var(--pf-accent); background: var(--pf-accent-soft); }
 .pf-root.pf-professional .pf-entry, .pf-root.pf-professional .pf-skill-group { border-radius: 8px; box-shadow: none; }
 .pf-root.pf-professional .pf-section-title { font-size: 1.25rem; }
+/* Elegant - serif display, centered rules, editorial whitespace. */
+.pf-root.pf-elegant { --pf-radius: 3px; --pf-shadow: none; }
+.pf-root.pf-elegant .pf-hero { text-align: center; padding: 78px 24px 62px; background: var(--pf-surface); border-bottom: 1px solid var(--pf-border); }
+.pf-root.pf-elegant .pf-hero-bg { display: none; }
+.pf-root.pf-elegant .pf-hero-inner { max-width: 780px; }
+.pf-root.pf-elegant .pf-hero-avatar { width: 66px; height: 66px; border-radius: 50%; background: none; border: 1px solid var(--pf-accent); color: var(--pf-accent); box-shadow: none; font-size: 1.05rem; letter-spacing: .08em; }
+.pf-root.pf-elegant .pf-hero-name { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: .07em; text-transform: uppercase; font-size: clamp(1.55rem, 3.6vw, 2.35rem); background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-elegant .pf-hero-role { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; letter-spacing: .03em; }
+.pf-root.pf-elegant .pf-hero-intro { max-width: 620px; }
+.pf-root.pf-elegant .pf-section { max-width: 800px; }
+.pf-root.pf-elegant .pf-section-head { flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.pf-root.pf-elegant .pf-section-icon { width: auto; height: auto; background: none; box-shadow: none; color: var(--pf-accent); font-size: 1.05rem; }
+.pf-root.pf-elegant .pf-section-title { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; text-transform: uppercase; letter-spacing: .16em; font-size: 1.02rem; }
+.pf-root.pf-elegant .pf-section-title::after { width: 64px; height: 1px; background: var(--pf-accent); margin-left: auto; margin-right: auto; }
+.pf-root.pf-elegant .pf-section-head.visible .pf-section-title::after { width: 64px; }
+.pf-root.pf-elegant .pf-entry, .pf-root.pf-elegant .pf-skill-group { background: none; border-color: transparent; border-bottom: 1px solid var(--pf-border); border-radius: 3px; box-shadow: none; padding-left: 0; padding-right: 0; }
+.pf-root.pf-elegant .pf-entry::before { display: none; }
+.pf-root.pf-elegant .pf-timeline { padding-left: 0; }
+.pf-root.pf-elegant .pf-timeline::before { display: none; }
+.pf-root.pf-elegant .pf-project { border-top-width: 1px; }
+/* Bold - oversized uppercase type and thick accent bars. */
+.pf-root.pf-bold { --pf-radius: 10px; }
+.pf-root.pf-bold .pf-hero { text-align: left; padding: 60px 24px 52px; background: var(--pf-surface); border-bottom: 6px solid var(--pf-accent); }
+.pf-root.pf-bold .pf-hero-bg { display: none; }
+.pf-root.pf-bold .pf-hero-inner { max-width: 940px; }
+.pf-root.pf-bold .pf-hero-avatar { margin-left: 0; margin-right: 0; border-radius: 6px; background: var(--pf-accent); box-shadow: none; font-size: 2rem; }
+.pf-root.pf-bold .pf-hero-name { font-weight: 900; text-transform: uppercase; letter-spacing: -.03em; line-height: 1.05; font-size: clamp(2rem, 5.4vw, 3.3rem); background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-bold .pf-hero-role { text-transform: uppercase; letter-spacing: .18em; font-size: .86rem; font-weight: 800; }
+.pf-root.pf-bold .pf-hero-intro { max-width: 660px; margin-left: 0; }
+.pf-root.pf-bold .pf-hero-pills { justify-content: flex-start; }
+.pf-root.pf-bold .pf-section-icon { width: 52px; height: 52px; border-radius: 4px; font-size: 1.35rem; }
+.pf-root.pf-bold .pf-section-title { text-transform: uppercase; font-weight: 900; letter-spacing: -.01em; font-size: 1.7rem; }
+.pf-root.pf-bold .pf-section-title::after { width: 72px; height: 7px; border-radius: 0; }
+.pf-root.pf-bold .pf-section-head.visible .pf-section-title::after { width: 132px; }
+.pf-root.pf-bold .pf-index { font-size: 1rem; }
+.pf-root.pf-bold .pf-entry { border-left: 8px solid var(--pf-accent); padding-left: 22px; }
+.pf-root.pf-bold .pf-entry::before { display: none; }
+.pf-root.pf-bold .pf-project { border-top-width: 8px; }
+.pf-root.pf-bold .pf-project-number { border-radius: 4px; font-weight: 900; }
+/* Creative - big radii, gradient wash and a slowly spinning accent ring. */
+.pf-root.pf-creative { --pf-radius: 26px; }
+.pf-root.pf-creative .pf-hero { border-radius: 0 0 40px 40px; background: linear-gradient(150deg, var(--pf-accent-soft), transparent 58%), var(--pf-surface); border-bottom: 1px solid var(--pf-border); }
+.pf-root.pf-creative .pf-hero-bg span { opacity: .4; }
+.pf-root.pf-creative .pf-hero-avatar { border-radius: 50%; position: relative; font-size: 1.45rem; }
+.pf-root.pf-creative .pf-hero-avatar::after { content: ""; position: absolute; inset: -7px; border-radius: 50%; border: 2px dashed var(--pf-accent); opacity: .55; animation: pfSpin 14s linear infinite; }
+.pf-root.pf-creative .pf-entry, .pf-root.pf-creative .pf-skill-group { border-radius: 26px; }
+.pf-root.pf-creative .pf-project { border-top: 0; border-left: 5px solid var(--pf-accent); }
+.pf-root.pf-creative .pf-chip, .pf-root.pf-creative .pf-section-title::after { border-radius: 999px; }
+@keyframes pfSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+/* Magazine - editorial cover, oversized numbering and real text columns. */
+.pf-root.pf-magazine { --pf-radius: 2px; }
+.pf-root.pf-magazine .pf-hero { text-align: left; padding: 62px 24px 46px; background: none; border-bottom: 3px double var(--pf-text); }
+.pf-root.pf-magazine .pf-hero-bg { display: none; }
+.pf-root.pf-magazine .pf-hero-avatar { margin: 0 0 16px; border-radius: 0; background: none; border: 2px solid var(--pf-text); color: var(--pf-text); box-shadow: none; font-size: 1.4rem; }
+.pf-root.pf-magazine .pf-hero-name { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: -.01em; font-size: clamp(2.1rem, 5.6vw, 3.3rem); background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-magazine .pf-hero-role { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 400; font-size: 1.06rem; color: var(--pf-muted); }
+.pf-root.pf-magazine .pf-hero-intro { max-width: 60ch; border-left: 3px solid var(--pf-accent); padding-left: 16px; }
+.pf-root.pf-magazine .pf-section { max-width: 960px; }
+.pf-root.pf-magazine .pf-section-head { align-items: baseline; gap: 14px; border-bottom: 1px solid var(--pf-border); padding-bottom: 10px; }
+.pf-root.pf-magazine .pf-section-icon { width: auto; height: auto; background: none; box-shadow: none; color: var(--pf-text); font-size: 1rem; }
+.pf-root.pf-magazine .pf-index { font-family: Georgia, 'Times New Roman', serif; font-size: 1.9rem; line-height: 1; letter-spacing: 0; color: var(--pf-accent); }
+.pf-root.pf-magazine .pf-section-title { font-family: Georgia, 'Times New Roman', serif; font-weight: 400; letter-spacing: -.005em; }
+.pf-root.pf-magazine .pf-section-title::after { width: 100%; height: 1px; border-radius: 0; background: var(--pf-border); }
+.pf-root.pf-magazine .pf-section-body { column-count: 2; column-gap: 34px; column-rule: 1px solid var(--pf-border); }
+.pf-root.pf-magazine .pf-entries-grid, .pf-root.pf-magazine .pf-project-grid, .pf-root.pf-magazine .pf-skills { grid-template-columns: minmax(0, 1fr); }
+.pf-root.pf-magazine .pf-entry, .pf-root.pf-magazine .pf-skill-group, .pf-root.pf-magazine .pf-project { break-inside: avoid; margin: 0 0 14px; padding: 0 0 14px; background: none; border: 0; border-bottom: 1px dotted var(--pf-border); border-radius: 0; box-shadow: none; }
+.pf-root.pf-magazine .pf-entry-title { font-family: Georgia, 'Times New Roman', serif; }
+.pf-root.pf-magazine .pf-chip, .pf-root.pf-magazine .pf-pill, .pf-root.pf-magazine .pf-entry-meta { border-radius: 2px; box-shadow: none; }
+@media(max-width:760px) { .pf-root.pf-magazine .pf-section-body { column-count: 1; } }
+/* Terminal - monospace type, prompt marks and hairline rules. */
+.pf-root.pf-terminal { --pf-radius: 0; --pf-shadow: none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
+.pf-root.pf-terminal .pf-hero { text-align: left; padding: 54px 24px 46px; background: var(--pf-surface); border-bottom: 1px dashed var(--pf-border); }
+.pf-root.pf-terminal .pf-hero-bg { display: none; }
+.pf-root.pf-terminal .pf-hero-avatar { margin: 0 0 14px; border-radius: 0; background: none; border: 1px solid var(--pf-accent); color: var(--pf-accent); box-shadow: none; font-size: 1.05rem; }
+.pf-root.pf-terminal .pf-hero-name { font-size: clamp(1.6rem, 4.2vw, 2.4rem); font-weight: 700; letter-spacing: -.02em; background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-terminal .pf-hero-name::before { content: "$ "; color: var(--pf-accent); }
+.pf-root.pf-terminal .pf-hero-role { font-size: .98rem; letter-spacing: 0; }
+.pf-root.pf-terminal .pf-hero-role::before { content: "> "; color: var(--pf-accent); }
+.pf-root.pf-terminal .pf-section-head { border-bottom: 1px dashed var(--pf-border); padding-bottom: 8px; }
+.pf-root.pf-terminal .pf-section-icon { width: auto; height: auto; border-radius: 0; background: none; box-shadow: none; color: var(--pf-accent); font-size: 1rem; }
+.pf-root.pf-terminal .pf-section-title { font-weight: 600; letter-spacing: -.01em; }
+.pf-root.pf-terminal .pf-section-title::before { content: "# "; color: var(--pf-accent); }
+.pf-root.pf-terminal .pf-section-title::after { display: none; }
+.pf-root.pf-terminal .pf-entry, .pf-root.pf-terminal .pf-skill-group, .pf-root.pf-terminal .pf-project { border-radius: 0; border-style: dashed; box-shadow: none; }
+.pf-root.pf-terminal .pf-entry-list li::before { width: 7px; height: 2px; border-radius: 0; background: var(--pf-accent); transform: none; top: .82em; }
+.pf-root.pf-terminal .pf-chip, .pf-root.pf-terminal .pf-pill, .pf-root.pf-terminal .pf-entry-meta { border-radius: 0; box-shadow: none; }
+.pf-root.pf-terminal .pf-chip::before { background: none; }
+.pf-root.pf-terminal .pf-chip::after { content: ""; flex: none; width: 5px; height: 10px; background: var(--pf-accent); }
+.pf-root.pf-terminal .pf-entry-meta { border-color: var(--pf-accent); }
+/* Glass - frosted translucent cards over a soft gradient mesh. */
+.pf-root.pf-glass { --pf-radius: 22px; }
+.pf-root.pf-glass .pf-hero { background: linear-gradient(135deg, var(--pf-accent-soft), transparent 58%), radial-gradient(circle at 82% 18%, var(--pf-accent-soft), transparent 58%), var(--pf-surface); }
+.pf-root.pf-glass .pf-hero-bg span { opacity: .45; }
+.pf-root.pf-glass .pf-hero-avatar { border-radius: 26px; }
+.pf-root.pf-glass .pf-nav { background: rgba(255, 255, 255, .72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.pf-root.pf-glass.pf-dark .pf-nav { background: rgba(20, 28, 48, .72); }
+.pf-root.pf-glass .pf-entry, .pf-root.pf-glass .pf-skill-group, .pf-root.pf-glass .pf-project { background: rgba(255, 255, 255, .62); border: 1px solid rgba(255, 255, 255, .75); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 18px 42px rgba(15, 23, 42, .12); }
+.pf-root.pf-glass.pf-dark .pf-entry, .pf-root.pf-glass.pf-dark .pf-skill-group, .pf-root.pf-glass.pf-dark .pf-project { background: rgba(20, 28, 48, .55); border-color: rgba(255, 255, 255, .12); box-shadow: 0 18px 42px rgba(0, 0, 0, .35); }
+.pf-root.pf-glass .pf-project { border-top: 3px solid var(--pf-accent); }
+.pf-root.pf-glass .pf-chip { background: rgba(255, 255, 255, .55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-color: rgba(255, 255, 255, .7); }
+.pf-root.pf-glass.pf-dark .pf-chip { background: rgba(20, 28, 48, .5); border-color: rgba(255, 255, 255, .14); }
+.pf-root.pf-glass .pf-section-title::after { height: 3px; background: linear-gradient(90deg, var(--pf-accent), transparent); }
+/* Retro - neo-brutalist outlines and hard offset shadows. */
+.pf-root.pf-retro { --pf-radius: 0; --pf-shadow: 6px 6px 0 var(--pf-text); }
+.pf-root.pf-retro .pf-hero { text-align: left; padding: 56px 24px 50px; background: var(--pf-accent-soft); border-bottom: 4px solid var(--pf-text); }
+.pf-root.pf-retro .pf-hero-bg { display: none; }
+.pf-root.pf-retro .pf-hero-avatar { margin: 0 0 16px; border-radius: 0; background: var(--pf-accent); border: 3px solid var(--pf-text); box-shadow: 5px 5px 0 var(--pf-text); font-size: 1.6rem; }
+.pf-root.pf-retro .pf-hero-name { font-weight: 900; text-transform: uppercase; letter-spacing: -.02em; line-height: 1.04; font-size: clamp(1.9rem, 5vw, 3rem); background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; animation: none; }
+.pf-root.pf-retro .pf-hero-role { text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: .84rem; }
+.pf-root.pf-retro .pf-section-icon { border-radius: 0; box-shadow: 3px 3px 0 var(--pf-text); }
+.pf-root.pf-retro .pf-section-title { text-transform: uppercase; font-weight: 900; letter-spacing: -.01em; }
+.pf-root.pf-retro .pf-section-title::after { height: 6px; border-radius: 0; background: var(--pf-text); }
+.pf-root.pf-retro .pf-entry, .pf-root.pf-retro .pf-skill-group, .pf-root.pf-retro .pf-project { border: 3px solid var(--pf-text); border-radius: 0; box-shadow: 6px 6px 0 var(--pf-text); }
+.pf-root.pf-retro .pf-project { border-top: 3px solid var(--pf-text); }
+.pf-root.pf-retro .pf-chip { border: 2px solid var(--pf-text); border-radius: 0; box-shadow: 3px 3px 0 var(--pf-text); background: var(--pf-surface); }
+.pf-root.pf-retro .pf-pill:not(.pf-pill-accent) { border-radius: 0; border: 2px solid var(--pf-text); background: transparent; color: var(--pf-text); }
+.pf-root.pf-retro .pf-entry-meta { border-radius: 0; border: 2px solid var(--pf-text); background: transparent; color: var(--pf-text); }
+/* Neon - accent-lit borders and soft glows on a deeper surface. */
+.pf-root.pf-neon { --pf-radius: 14px; }
+.pf-root.pf-neon .pf-hero { background: radial-gradient(circle at 50% 0%, var(--pf-accent-soft), transparent 62%), var(--pf-surface); border-bottom: 1px solid var(--pf-accent); }
+.pf-root.pf-neon .pf-hero-bg span { opacity: .5; }
+.pf-root.pf-neon .pf-hero-avatar { background: transparent; border: 2px solid var(--pf-accent); color: var(--pf-accent); box-shadow: 0 0 22px var(--pf-accent-soft), inset 0 0 18px var(--pf-accent-soft); }
+.pf-root.pf-neon .pf-hero-name { text-shadow: 0 0 26px var(--pf-accent-soft); }
+.pf-root.pf-neon .pf-section-icon { background: transparent; color: var(--pf-accent); border: 1px solid var(--pf-accent); box-shadow: 0 0 18px var(--pf-accent-soft); }
+.pf-root.pf-neon .pf-entry, .pf-root.pf-neon .pf-skill-group, .pf-root.pf-neon .pf-project { border: 1px solid var(--pf-accent); box-shadow: 0 0 0 1px var(--pf-accent-soft), 0 14px 34px var(--pf-accent-soft); }
+.pf-root.pf-neon .pf-project { border-top: 3px solid var(--pf-accent); }
+.pf-root.pf-neon .pf-chip { background: transparent; border-color: var(--pf-accent); color: var(--pf-accent); box-shadow: 0 0 14px var(--pf-accent-soft); }
+.pf-root.pf-neon .pf-section-title::after { background: var(--pf-accent); box-shadow: 0 0 14px var(--pf-accent); }
+/* Pastel - washed tints, very round cards and generous spacing. */
+.pf-root.pf-pastel { --pf-radius: 28px; --pf-shadow: 0 14px 34px var(--pf-accent-soft); }
+.pf-root.pf-pastel .pf-hero { background: linear-gradient(180deg, var(--pf-accent-soft), transparent 78%), var(--pf-surface); border-bottom: 1px solid var(--pf-border); }
+.pf-root.pf-pastel .pf-hero-bg span { opacity: .3; filter: blur(80px); }
+.pf-root.pf-pastel .pf-hero-avatar { border-radius: 34%; background: var(--pf-accent-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-root.pf-pastel .pf-hero-name { animation: none; background: none; color: var(--pf-text); -webkit-text-fill-color: currentColor; font-weight: 800; }
+.pf-root.pf-pastel .pf-section { padding-top: 52px; padding-bottom: 52px; }
+.pf-root.pf-pastel .pf-entry, .pf-root.pf-pastel .pf-skill-group, .pf-root.pf-pastel .pf-project { border-radius: 28px; border-color: transparent; box-shadow: var(--pf-shadow); }
+.pf-root.pf-pastel .pf-project { border-top: 3px solid var(--pf-accent); }
+.pf-root.pf-pastel .pf-chip { border-color: transparent; background: var(--pf-accent-soft); }
+.pf-root.pf-pastel .pf-section-icon { border-radius: 50%; background: var(--pf-accent-soft); color: var(--pf-accent); box-shadow: none; }
+.pf-root.pf-pastel .pf-section-title::after { height: 6px; border-radius: 999px; }
+/* Compact - dense single column tuned for printing and quick scanning. */
+.pf-root.pf-compact { --pf-radius: 6px; --pf-shadow: none; font-size: .95rem; }
+.pf-root.pf-compact .pf-hero { padding: 32px 20px 26px; }
+.pf-root.pf-compact .pf-hero-bg { display: none; }
+.pf-root.pf-compact .pf-hero-avatar { width: 46px; height: 46px; border-radius: 8px; font-size: 1rem; box-shadow: none; }
+.pf-root.pf-compact .pf-hero-name { font-size: clamp(1.4rem, 3.2vw, 1.9rem); }
+.pf-root.pf-compact .pf-hero-intro { font-size: .92rem; }
+.pf-root.pf-compact .pf-section { max-width: 760px; padding-top: 20px; padding-bottom: 20px; }
+.pf-root.pf-compact .pf-section-head { margin-bottom: 12px; }
+.pf-root.pf-compact .pf-section-icon { width: 26px; height: 26px; border-radius: 6px; font-size: .8rem; box-shadow: none; }
+.pf-root.pf-compact .pf-section-title { font-size: 1.12rem; }
+.pf-root.pf-compact .pf-section-title::after { width: 30px; height: 2px; }
+.pf-root.pf-compact .pf-entry, .pf-root.pf-compact .pf-skill-group, .pf-root.pf-compact .pf-project { margin: 8px 0; padding: 12px 14px; border-radius: 6px; box-shadow: none; }
+.pf-root.pf-compact .pf-entries-grid, .pf-root.pf-compact .pf-project-grid, .pf-root.pf-compact .pf-skills { grid-template-columns: minmax(0, 1fr); }
+.pf-root.pf-compact .pf-chip { padding: 4px 10px; font-size: .78rem; box-shadow: none; }
+.pf-root.pf-compact .pf-entry-text, .pf-root.pf-compact .pf-lines p { font-size: .9rem; line-height: 1.6; }
+/* Split - section headings pinned in a left rail beside their content. */
+.pf-root.pf-split { --pf-radius: 12px; }
+.pf-root.pf-split .pf-hero { text-align: left; }
+.pf-root.pf-split .pf-hero-avatar { margin-left: 0; margin-right: 0; }
+.pf-root.pf-split .pf-hero-pills { justify-content: flex-start; }
+.pf-root.pf-split .pf-section { display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr); gap: 10px 30px; align-items: start; max-width: 1040px; }
+.pf-root.pf-split .pf-section-head { grid-column: 1; grid-row: 1; position: sticky; top: 84px; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 0; padding-right: 18px; border-right: 2px solid var(--pf-accent-soft); }
+.pf-root.pf-split .pf-section-body { grid-column: 2; grid-row: 1; }
+.pf-root.pf-split .pf-section-body:first-child { grid-column: 1 / -1; }
+.pf-root.pf-split .pf-section-title::after { width: 34px; height: 3px; }
+@media(max-width:820px) {
+.pf-root.pf-split .pf-section { grid-template-columns: minmax(0, 1fr); }
+.pf-root.pf-split .pf-section-head { position: static; border-right: 0; padding-right: 0; }
+.pf-root.pf-split .pf-section-body { grid-column: 1; grid-row: auto; }
+}
+/* Aurora - a slow shifting gradient wash over hero, rules and chips. */
+.pf-root.pf-aurora { --pf-radius: 18px; }
+.pf-root.pf-aurora .pf-hero { background: linear-gradient(115deg, var(--pf-accent-soft), transparent 42%, var(--pf-accent-soft)), var(--pf-surface); background-size: 220% 220%; animation: pfAurora 18s ease-in-out infinite; }
+.pf-root.pf-aurora .pf-hero-bg span { opacity: .38; }
+.pf-root.pf-aurora .pf-hero-name { text-shadow: 0 6px 26px var(--pf-accent-soft); }
+.pf-root.pf-aurora .pf-section-title::after { height: 5px; background: linear-gradient(90deg, var(--pf-accent), var(--pf-accent-2), var(--pf-accent)); background-size: 220% auto; animation: pfShine 8s linear infinite; }
+.pf-root.pf-aurora .pf-entry, .pf-root.pf-aurora .pf-skill-group, .pf-root.pf-aurora .pf-project { border-color: transparent; background: linear-gradient(160deg, var(--pf-accent-soft), transparent 55%), var(--pf-surface); box-shadow: 0 16px 36px var(--pf-accent-soft); }
+.pf-root.pf-aurora .pf-project { border-top: 3px solid var(--pf-accent); }
+.pf-root.pf-aurora .pf-chip { border-color: transparent; background: linear-gradient(120deg, var(--pf-accent-soft), transparent), var(--pf-surface); }
+.pf-root.pf-aurora .pf-section-icon { background: linear-gradient(135deg, var(--pf-accent), var(--pf-accent-2)); }
+@keyframes pfAurora { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
 @media(prefers-reduced-motion:reduce) {
 .pf-root *, .pf-root *::before, .pf-root *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 .pf-root .reveal { opacity: 1; transform: none; }
@@ -811,13 +1130,7 @@ const PortfolioGenerator = (function () {
        opens anywhere. Scope mirrors the live preview design system. */
     const STANDALONE_CSS = 'body{margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,system-ui,sans-serif;}' +
         '.pf-root{--pf-bg:#f8fafc;--pf-surface:#ffffff;--pf-text:#0f172a;--pf-muted:#64748b;--pf-border:#e2e8f0;--pf-accent:#6366f1;--pf-accent-2:#8b5cf6;--pf-accent-soft:rgba(99,102,241,.12);--pf-radius:16px;--pf-shadow:0 10px 30px rgba(15,23,42,.08);}' +
-        '.pf-root.pf-dark{--pf-bg:#0b1220;--pf-surface:#141c30;--pf-text:#e6edf7;--pf-muted:#94a3b8;--pf-border:#26334d;--pf-accent-soft:rgba(99,102,241,.22);}' +
-        '.pf-root.pf-blue{--pf-accent:#3b82f6;--pf-accent-2:#2563eb;--pf-accent-soft:rgba(59,130,246,.13);}' +
-        '.pf-root.pf-emerald{--pf-accent:#10b981;--pf-accent-2:#059669;--pf-accent-soft:rgba(16,185,129,.14);}' +
-        '.pf-root.pf-rose{--pf-accent:#f43f5e;--pf-accent-2:#e11d48;--pf-accent-soft:rgba(244,63,94,.13);}' +
-        '.pf-root.pf-amber{--pf-accent:#f59e0b;--pf-accent-2:#d97706;--pf-accent-soft:rgba(245,158,11,.15);}' +
-        '.pf-root.pf-purple{--pf-accent:#8b5cf6;--pf-accent-2:#7c3aed;--pf-accent-soft:rgba(139,92,246,.14);}' +
-        '.pf-root.pf-indigo{--pf-accent:#6366f1;--pf-accent-2:#8b5cf6;--pf-accent-soft:rgba(99,102,241,.12);}' +
+        '.pf-root.pf-dark{--pf-bg:#0b1220;--pf-surface:#141c30;--pf-text:#e6edf7;--pf-muted:#94a3b8;--pf-border:#26334d;}' +
         '.pf-nav{position:sticky;top:0;z-index:20;background:var(--pf-surface);border-bottom:1px solid var(--pf-border);}' +
         '.pf-nav-inner{position:relative;max-width:1060px;margin:0 auto;padding:10px 20px;}' +
         '.pf-nav ul{display:flex;flex-wrap:wrap;gap:6px;align-items:center;list-style:none;margin:0;padding:0;}' +
@@ -917,6 +1230,9 @@ const PortfolioGenerator = (function () {
     function initPreviewPage() {
         previewListeners.forEach((remove) => remove());
         previewListeners = [];
+        /* Controls are generated from the registries before anything binds
+           to them, so the sidebar always matches the shipped designs/colors. */
+        buildPicker();
         const frame = document.getElementById('portfolioPreview');
         const data = App.getData();
         if (!frame) return;
@@ -981,6 +1297,7 @@ const PortfolioGenerator = (function () {
                 if (root) root.className = appearanceClasses(custom);
                 else paint();
                 App.saveCustom(custom);
+                syncPickerLabels();
             }));
         }
         bindRadios('theme', (v) => custom.theme = v);
@@ -1120,13 +1437,63 @@ const PortfolioGenerator = (function () {
         paint();
     }
 
+    /* ---------- sidebar pickers (generated from the registries) ----------
+       Building the controls from the same data that draws the portfolio
+       removes any chance of the sidebar offering a design or a colour with
+       no rule behind it. The sidebar intentionally lists only the featured
+       templates; the gallery is where the full set lives. */
+    function buildPicker() {
+        const tplHost = document.getElementById('templateOptions');
+        if (tplHost && !tplHost.querySelector('input')) {
+            tplHost.innerHTML = FEATURED_TEMPLATES.map((t) =>
+                '<label class="template-option"><input type="radio" name="layout" value="' + esc(t.id) + '">' +
+                '<span class="template-card"><span class="template-thumb template-thumb-' + esc(t.id) +
+                '" aria-hidden="true"><i></i><i></i><i></i></span>' +
+                '<span><strong>' + esc(t.name) + '</strong><small>' + esc(t.tagline) + '</small></span></span></label>').join('');
+        }
+        const colorHost = document.getElementById('colorOptions');
+        if (colorHost && !colorHost.querySelector('input')) {
+            colorHost.innerHTML = COLORS.map((c) =>
+                '<label class="color-option" data-v="' + esc(c.id) + '" title="' + esc(c.name) + '">' +
+                '<input type="radio" name="color" value="' + esc(c.id) + '" aria-label="' + esc(c.name) + '">' +
+                '<span style="background:' + esc(c.accent) + '"></span></label>').join('');
+        }
+        syncPickerLabels();
+    }
+
+    /* Reflect the saved customization in the sidebar. A template chosen from
+       the gallery is not among the featured three, so the note states which
+       design is actually in use instead of silently checking a stale tile. */
+    function syncPickerLabels() {
+        const custom = App.getCustom();
+        const active = TEMPLATES.filter((t) => t.id === custom.layout)[0];
+        const note = document.getElementById('templateActiveNote');
+        if (note) {
+            note.textContent = active
+                ? 'In use: ' + active.name + (active.featured ? '' : ' (chosen from the gallery)')
+                : 'Choose a design to apply it instantly.';
+        }
+        document.querySelectorAll('input[name="layout"]').forEach((r) => { r.checked = (r.value === custom.layout); });
+        document.querySelectorAll('input[name="color"]').forEach((r) => { r.checked = (r.value === custom.color); });
+    }
+
     /* ---------- public API ---------- */
     return {
         render: buildPortfolioHtml,
         buildStandalone: buildStandalone,
         initPreviewPage: initPreviewPage,
         validate: validate,
-        classify: ResumeAnalyzer.classify
+        classify: ResumeAnalyzer.classify,
+        templates: TEMPLATES,
+        templateIds: TEMPLATE_IDS,
+        featuredTemplates: FEATURED_TEMPLATES,
+        featuredIds: FEATURED_IDS,
+        colors: COLORS,
+        colorIds: COLOR_IDS,
+        layoutCss: () => PORTFOLIO_LAYOUT_CSS,
+        buildPicker: buildPicker,
+        syncPickerLabels: syncPickerLabels,
+        appearanceClasses: appearanceClasses
     };
 })();
 
